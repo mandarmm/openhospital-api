@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -180,5 +181,24 @@ class MedicalStockWardControllerTest {
 
 		verify(movWardBrowserManagerMock).getMovementWard("I", LocalDateTime.of(2026, 10, 1, 0, 0),
 			LocalDate.of(2026, 10, 2).atTime(LocalTime.MAX));
+	}
+
+	@Test
+	void testDeleteLastMovementWard() throws Exception {
+		Ward ward = ward();
+		MovementWard last = new MovementWard();
+		last.setCode(9);
+		when(wardBrowserManagerMock.getWards()).thenReturn(List.of(ward));
+		when(movWardBrowserManagerMock.getLastMovementWard(ward)).thenReturn(last);
+
+		this.mockMvc.perform(delete("/medicalstockward/movements/{ward_code}/{code}", "I", 9).param("reason", " wrong patient "))
+			.andExpect(status().isOk());
+		verify(movWardBrowserManagerMock).deleteLastMovementWard(last, "wrong patient");
+
+		this.mockMvc.perform(delete("/medicalstockward/movements/{ward_code}/{code}", "I", 8).param("reason", "x"))
+			.andExpect(status().isBadRequest());
+		this.mockMvc.perform(delete("/medicalstockward/movements/{ward_code}/{code}", "I", 9).param("reason", " "))
+			.andExpect(status().isBadRequest());
+		verify(movWardBrowserManagerMock).deleteLastMovementWard(any(), any());
 	}
 }
