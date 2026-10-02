@@ -23,6 +23,8 @@ package org.isf.medicalstockward.rest;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.validation.Valid;
@@ -148,7 +150,8 @@ public class MedicalStockWardController {
 
 		LocalDateTime dateToTime = null;
 		if (dateTo != null) {
-			dateToTime = dateTo.atStartOfDay();
+			// the whole day: the movements of the "to" day were left out
+			dateToTime = dateTo.atTime(LocalTime.MAX);
 		}
 
 		return movementWardMapper.map2DTOList(movWardBrowserManager.getMovementWard(wardId, dateFromTime, dateToTime));
@@ -179,6 +182,23 @@ public class MedicalStockWardController {
 	 * @return {@code true} if the movement has been persisted, {@code false} otherwise.
 	 * @throws OHServiceException When failed to create ward stock movement
 	 */
+	/**
+	 * Creates several movements at once, e.g. a quantity taken from several lots (each movement has one lot): all or
+	 * none are saved.
+	 *
+	 * @param newMovementDTOs the movements
+	 * @return {@code true} if the movements have been created
+	 * @throws OHServiceException When failed to create the movements
+	 */
+	@PostMapping(value = "/medicalstockward/movements/list")
+	@ResponseStatus(HttpStatus.CREATED)
+	public boolean newMovementsWard(
+		@Valid @RequestBody List<MovementWardDTO> newMovementDTOs
+	) throws OHServiceException {
+		movWardBrowserManager.newMovementWard(new ArrayList<>(movementWardMapper.map2ModelList(newMovementDTOs)));
+		return true;
+	}
+
 	@PostMapping(value = "/medicalstockward/movements")
 	@ResponseStatus(HttpStatus.CREATED)
 	public boolean newMovementWard(

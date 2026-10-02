@@ -21,16 +21,51 @@
  */
 package org.isf.medicalstockward.mapper;
 
+import java.util.List;
+
+import org.isf.medicalstock.mapper.LotMapper;
 import org.isf.medicalstockward.dto.MovementWardDTO;
 import org.isf.medicalstockward.model.MovementWard;
 import org.isf.shared.GenericMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class MovementWardMapper extends GenericMapper<MovementWard, MovementWardDTO> {
 
+	@Autowired
+	private LotMapper lotMapper;
+
 	public MovementWardMapper() {
 		super(MovementWard.class, MovementWardDTO.class);
 	}
 
+	/*
+	 * The lot is mapped by hand: the model's setter is "setlot", which the implicit mapping does not find, and without
+	 * a lot the ward stock cannot be updated.
+	 */
+
+	@Override
+	public MovementWardDTO map2DTO(MovementWard movement) {
+		MovementWardDTO dto = super.map2DTO(movement);
+		dto.setLot(movement.getLot() == null ? null : lotMapper.map2DTO(movement.getLot()));
+		return dto;
+	}
+
+	@Override
+	public MovementWard map2Model(MovementWardDTO dto) {
+		MovementWard movement = super.map2Model(dto);
+		movement.setlot(dto.getLot() == null ? null : lotMapper.map2Model(dto.getLot()));
+		return movement;
+	}
+
+	@Override
+	public List<MovementWardDTO> map2DTOList(List<MovementWard> list) {
+		return list.stream().map(this::map2DTO).toList();
+	}
+
+	@Override
+	public List<MovementWard> map2ModelList(List<MovementWardDTO> list) {
+		return list.stream().map(this::map2Model).toList();
+	}
 }

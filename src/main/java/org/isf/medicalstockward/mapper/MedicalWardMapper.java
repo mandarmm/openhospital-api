@@ -21,16 +21,39 @@
  */
 package org.isf.medicalstockward.mapper;
 
+import java.util.List;
+
+import org.isf.medicalstock.mapper.LotMapper;
 import org.isf.medicalstockward.dto.MedicalWardDTO;
 import org.isf.medicalstockward.model.MedicalWard;
 import org.isf.shared.GenericMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class MedicalWardMapper extends GenericMapper<MedicalWard, MedicalWardDTO> {
 
+	@Autowired
+	private LotMapper lotMapper;
+
 	public MedicalWardMapper() {
 		super(MedicalWard.class, MedicalWardDTO.class);
 	}
-	
+
+	/**
+	 * With the lot: the stock of a ward is kept per lot (and the lot gives the expiry date).
+	 */
+	@Override
+	public MedicalWardDTO map2DTO(MedicalWard medicalWard) {
+		MedicalWardDTO dto = super.map2DTO(medicalWard);
+		if (dto.getId() != null) {
+			dto.getId().setLot(medicalWard.getLot() == null ? null : lotMapper.map2DTO(medicalWard.getLot()));
+		}
+		return dto;
+	}
+
+	@Override
+	public List<MedicalWardDTO> map2DTOList(List<MedicalWard> list) {
+		return list.stream().map(this::map2DTO).toList();
+	}
 }
