@@ -114,11 +114,9 @@ class GroupMenuTest {
 		mockMvc.perform(get("/usergroups/guest/menu"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.length()").value(4))
-			.andExpect(jsonPath("$[0].code").value("ward"))
-			.andExpect(jsonPath("$[0].active").value(true))
-			.andExpect(jsonPath("$[0].label").value("angal.menu.ward"))
-			.andExpect(jsonPath("$[1].code").value("disease"))
-			.andExpect(jsonPath("$[1].active").value(false));
+			.andExpect(jsonPath("$[?(@.code=='ward')].active").value(true))
+			.andExpect(jsonPath("$[?(@.code=='ward')].label").value("angal.menu.ward"))
+			.andExpect(jsonPath("$[?(@.code=='disease')].active").value(false));
 	}
 
 	@Test
@@ -156,6 +154,23 @@ class GroupMenuTest {
 				.content("[{\"code\":\"nosuchitem\",\"active\":true}]"))
 			.andExpect(status().isBadRequest());
 		verify(userManagerMock, never()).setGroupMenu(any(), anyList());
+	}
+
+	@Test
+	void menuIsSortedByParentPositionAndCode() throws Exception {
+		when(userManagerMock.getGroupMenu(argThat(group -> group != null && "admin".equals(group.getCode()))))
+			.thenAnswer(invocation -> new ArrayList<>(List.of(
+				new UserMenuItem("z", "b", "l", "x", 'X', "main", "none", false, 2, true),
+				new UserMenuItem("a", "b", "l", "x", 'X', "main", "none", false, 2, true),
+				new UserMenuItem("w", "b", "l", "x", 'X', "generaldata", "none", false, 1, true),
+				new UserMenuItem("m", "b", "l", "x", 'X', "main", "none", false, 1, true))));
+
+		mockMvc.perform(get("/usergroups/guest/menu"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].code").value("w"))
+			.andExpect(jsonPath("$[1].code").value("m"))
+			.andExpect(jsonPath("$[2].code").value("a"))
+			.andExpect(jsonPath("$[3].code").value("z"));
 	}
 
 	@Test
