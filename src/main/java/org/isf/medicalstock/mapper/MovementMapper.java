@@ -21,16 +21,39 @@
  */
 package org.isf.medicalstock.mapper;
 
+import java.util.List;
+
+import org.isf.medical.mapper.MedicalMapper;
 import org.isf.medicalstock.dto.MovementDTO;
 import org.isf.medicalstock.model.Movement;
 import org.isf.shared.GenericMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class MovementMapper extends GenericMapper<Movement, MovementDTO> {
 
+	@Autowired
+	private MedicalMapper medicalMapper;
+
 	public MovementMapper() {
 		super(Movement.class, MovementDTO.class);
 	}
-	
+
+	/**
+	 * The medical goes through its own mapper: implicitly mapped, it lost its product code.
+	 */
+	@Override
+	public MovementDTO map2DTO(Movement movement) {
+		MovementDTO dto = super.map2DTO(movement);
+		if (movement.getMedical() != null) {
+			dto.setMedical(medicalMapper.map2DTO(movement.getMedical()));
+		}
+		return dto;
+	}
+
+	@Override
+	public List<MovementDTO> map2DTOList(List<Movement> list) {
+		return list.stream().map(this::map2DTO).toList();
+	}
 }
