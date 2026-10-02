@@ -29,6 +29,7 @@ import jakarta.validation.Valid;
 
 import org.isf.menu.manager.UserBrowsingManager;
 import org.isf.menu.model.User;
+import org.isf.menu.model.UserMenuItem;
 import org.isf.permissions.dto.PermissionDTO;
 import org.isf.permissions.manager.PermissionManager;
 import org.isf.permissions.mapper.PermissionMapper;
@@ -36,6 +37,7 @@ import org.isf.permissions.model.Permission;
 import org.isf.shared.exceptions.OHAPIException;
 import org.isf.usergroups.mapper.UserGroupMapper;
 import org.isf.users.dto.UserDTO;
+import org.isf.users.dto.UserMenuItemDTO;
 import org.isf.users.dto.UserProfileDTO;
 import org.isf.users.mapper.UserMapper;
 import org.isf.utils.exception.OHServiceException;
@@ -221,6 +223,24 @@ public class UserController {
 		String currentUser = SecurityContextHolder.getContext().getAuthentication().getName();
 		LOGGER.info("Retrieving profile: retrieveProfileByCurrentLoggedInUser({}).", currentUser);
 		return retrieveProfile(currentUser);
+	}
+
+	/**
+	 * Returns the Swing menu items the current user sees, as set for their group.
+	 * @return the visible menu items
+	 * @throws OHServiceException When failed to read the menu
+	 */
+	@GetMapping("/users/me/menu")
+	public List<UserMenuItemDTO> retrieveMenuOfCurrentUser() throws OHServiceException {
+		String currentUser = SecurityContextHolder.getContext().getAuthentication().getName();
+		User user = userManager.getUserByName(currentUser);
+		if (user == null) {
+			throw new OHAPIException(new OHExceptionMessage("User not found."), HttpStatus.NOT_FOUND);
+		}
+		return userManager.getMenu(user).stream()
+			.filter(UserMenuItem::isActive)
+			.map(item -> new UserMenuItemDTO(item.getCode(), item.getAltLabel(), item.getMySubmenu(), item.isASubMenu(), item.getPosition()))
+			.toList();
 	}
 
 	/**
