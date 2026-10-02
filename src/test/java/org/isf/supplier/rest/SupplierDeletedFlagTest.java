@@ -96,7 +96,8 @@ class SupplierDeletedFlagTest {
 
 	@Test
 	void updateWithoutFlagKeepsDeletedSupplierDeleted() throws Exception {
-		when(managerMock.getByID(2)).thenReturn(supplier(2, 'Y'));
+		// the real getByID() does not find deleted suppliers
+		when(managerMock.getAll()).thenReturn(List.of(supplier(1, 'N'), supplier(2, 'Y')));
 
 		mockMvc.perform(put("/suppliers")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -111,7 +112,7 @@ class SupplierDeletedFlagTest {
 
 	@Test
 	void updateCanRestoreDeletedSupplier() throws Exception {
-		when(managerMock.getByID(2)).thenReturn(supplier(2, 'Y'));
+		when(managerMock.getAll()).thenReturn(List.of(supplier(2, 'Y')));
 
 		mockMvc.perform(put("/suppliers")
 				.contentType(MediaType.APPLICATION_JSON)

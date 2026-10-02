@@ -95,7 +95,11 @@ public class SupplierController {
 	 */
 	@PutMapping("/suppliers")
 	public SupplierDTO updateSupplier(@RequestBody @Valid SupplierDTO supplierDTO) throws OHServiceException {
-		Supplier current = supplierDTO.getSupId() == null ? null : manager.getByID(supplierDTO.getSupId());
+		// getByID() skips deleted suppliers, which can be updated (and restored) as well
+		Supplier current = supplierDTO.getSupId() == null ? null : manager.getAll().stream()
+			.filter(supplier -> supplierDTO.getSupId().equals(supplier.getSupId()))
+			.findFirst()
+			.orElse(null);
 		if (current == null) {
 			throw new OHAPIException(new OHExceptionMessage("Supplier not found."), HttpStatus.NOT_FOUND);
 		}
