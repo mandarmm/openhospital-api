@@ -278,6 +278,8 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.DELETE, "/users/**").hasAuthority("users.delete")
 				// user setting
 				.requestMatchers("/usersettings/**").authenticated()
+				// telemetry: an administration task (there is no telemetry permission)
+				.requestMatchers("/telemetry/**").hasAuthority("admin.access")
 				// pregnanttreatmenttypes
 				.requestMatchers(HttpMethod.POST, "/pregnanttreatmenttypes/**").hasAuthority("pregnanttreatmenttypes.create")
 				.requestMatchers(HttpMethod.GET, "/pregnanttreatmenttypes/**").hasAnyAuthority("pregnanttreatmenttypes.read")
