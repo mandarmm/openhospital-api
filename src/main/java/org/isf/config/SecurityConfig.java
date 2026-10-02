@@ -271,7 +271,7 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.PUT, "/usergroups/**").hasAuthority("usergroups.update")
 				.requestMatchers(HttpMethod.DELETE, "/usergroups/**").hasAuthority("usergroups.delete")
 				// user
-				.requestMatchers("/users/me").authenticated()
+				.requestMatchers("/users/me", "/users/me/menu").authenticated()
 				.requestMatchers(HttpMethod.POST, "/users").hasAuthority("users.create")
 				.requestMatchers(HttpMethod.POST, "/users/{username}/unlock").hasAuthority("users.update")
 				.requestMatchers(HttpMethod.GET, "/users/**").hasAuthority("users.read")
