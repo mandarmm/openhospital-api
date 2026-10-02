@@ -26,6 +26,7 @@ import java.util.List;
 import org.isf.medicalstock.mapper.LotMapper;
 import org.isf.medicalstockward.dto.MovementWardDTO;
 import org.isf.medicalstockward.model.MovementWard;
+import org.isf.patient.mapper.PatientMapper;
 import org.isf.shared.GenericMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -36,19 +37,24 @@ public class MovementWardMapper extends GenericMapper<MovementWard, MovementWard
 	@Autowired
 	private LotMapper lotMapper;
 
+	@Autowired
+	private PatientMapper patientMapper;
+
 	public MovementWardMapper() {
 		super(MovementWard.class, MovementWardDTO.class);
 	}
 
 	/*
 	 * The lot is mapped by hand: the model's setter is "setlot", which the implicit mapping does not find, and without
-	 * a lot the ward stock cannot be updated.
+	 * a lot the ward stock cannot be updated. The patient flag and the patient too: both have a "setPatient".
 	 */
 
 	@Override
 	public MovementWardDTO map2DTO(MovementWard movement) {
 		MovementWardDTO dto = super.map2DTO(movement);
 		dto.setLot(movement.getLot() == null ? null : lotMapper.map2DTO(movement.getLot()));
+		dto.setPatient(movement.isPatient());
+		dto.setPatient(movement.getPatient() == null ? null : patientMapper.map2DTO(movement.getPatient()));
 		return dto;
 	}
 
@@ -56,6 +62,8 @@ public class MovementWardMapper extends GenericMapper<MovementWard, MovementWard
 	public MovementWard map2Model(MovementWardDTO dto) {
 		MovementWard movement = super.map2Model(dto);
 		movement.setlot(dto.getLot() == null ? null : lotMapper.map2Model(dto.getLot()));
+		movement.setPatient(dto.isPatient());
+		movement.setPatient(dto.getPatient() == null ? null : patientMapper.map2Model(dto.getPatient()));
 		return movement;
 	}
 

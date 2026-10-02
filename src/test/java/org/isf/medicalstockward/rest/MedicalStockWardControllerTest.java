@@ -47,6 +47,7 @@ import org.isf.medicalstockward.mapper.MedicalWardMapper;
 import org.isf.medicalstockward.mapper.MovementWardMapper;
 import org.isf.medicalstockward.model.MedicalWard;
 import org.isf.medicalstockward.model.MovementWard;
+import org.isf.patient.mapper.PatientMapper;
 import org.isf.shared.exceptions.OHResponseEntityExceptionHandler;
 import org.isf.shared.mapper.mappings.LotMapping;
 import org.isf.shared.mapper.mappings.PatientMapping;
@@ -97,6 +98,9 @@ class MedicalStockWardControllerTest {
 			ReflectionTestUtils.setField(mapper, "modelMapper", modelMapper);
 			ReflectionTestUtils.setField(mapper, "lotMapper", lotMapper);
 		}
+		PatientMapper patientMapper = new PatientMapper();
+		ReflectionTestUtils.setField(patientMapper, "modelMapper", modelMapper);
+		ReflectionTestUtils.setField(movementWardMapper, "patientMapper", patientMapper);
 		this.mockMvc = MockMvcBuilders
 			.standaloneSetup(new MedicalStockWardController(medicalWardMapper, movementWardMapper, movWardBrowserManagerMock,
 				medicalBrowsingManagerMock, wardBrowserManagerMock))
@@ -200,5 +204,20 @@ class MedicalStockWardControllerTest {
 		this.mockMvc.perform(delete("/medicalstockward/movements/{ward_code}/{code}", "I", 9).param("reason", " "))
 			.andExpect(status().isBadRequest());
 		verify(movWardBrowserManagerMock).deleteLastMovementWard(any(), any());
+	}
+
+	@Test
+	void testNewMovementWard_toAPatient() throws Exception {
+		String body = """
+			{"ward":{"code":"I"},"date":"2026-10-02T10:00:00","isPatient":true,"patient":{"code":301,"firstName":"Kruse"},
+			 "age":44,"weight":70,"description":"Kruse Noe","medical":{"code":40},"quantity":5,"units":"pcs","lot":{"code":"L1"}}""";
+
+		this.mockMvc.perform(post("/medicalstockward/movements").contentType(MediaType.APPLICATION_JSON).content(body))
+			.andExpect(status().isCreated());
+
+		ArgumentCaptor<MovementWard> saved = ArgumentCaptor.forClass(MovementWard.class);
+		verify(movWardBrowserManagerMock).newMovementWard(saved.capture());
+		assertThat(saved.getValue().isPatient()).isTrue();
+		assertThat(saved.getValue().getPatient().getCode()).isEqualTo(301);
 	}
 }
