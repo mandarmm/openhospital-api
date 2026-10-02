@@ -201,6 +201,11 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.GET, "/medicalstockmovements/**").hasAuthority("medicalstockmovements.read")
 				.requestMatchers(HttpMethod.PUT, "/medicalstockmovements/**").hasAuthority("medicalstockmovements.update")
 				.requestMatchers(HttpMethod.DELETE, "/medicalstockmovements/**").hasAuthority("medicalstockmovements.delete")
+				// the same operations under their older path (StockMovementController), with the same permissions
+				.requestMatchers(HttpMethod.POST, "/stockmovements/**").hasAuthority("medicalstockmovements.create")
+				.requestMatchers(HttpMethod.GET, "/stockmovements/**").hasAuthority("medicalstockmovements.read")
+				.requestMatchers(HttpMethod.PUT, "/stockmovements/**").hasAuthority("medicalstockmovements.update")
+				.requestMatchers(HttpMethod.DELETE, "/stockmovements/**").hasAuthority("medicalstockmovements.delete")
 				// medicalstockward
 				.requestMatchers(HttpMethod.POST, "/medicalstockward/**").hasAuthority("medicalstockward.create")
 				.requestMatchers(HttpMethod.GET, "/medicalstockward/**").hasAuthority("medicalstockward.read")
@@ -341,6 +346,7 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.GET, "/wards/**").hasAnyAuthority("wards.read")
 				.requestMatchers(HttpMethod.PUT, "/wards/**").hasAuthority("wards.update")
 				.requestMatchers(HttpMethod.DELETE, "/wards/**").hasAuthority("wards.delete")
+				.requestMatchers(HttpMethod.GET, "/wardsNoMaternity").hasAuthority("wards.read")
 
 				.anyRequest().authenticated()
 
