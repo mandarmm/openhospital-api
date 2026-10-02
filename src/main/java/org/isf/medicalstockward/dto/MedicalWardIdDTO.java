@@ -24,6 +24,7 @@ package org.isf.medicalstockward.dto;
 import jakarta.validation.constraints.NotNull;
 
 import org.isf.medical.dto.MedicalDTO;
+import org.isf.medicalstock.dto.LotDTO;
 import org.isf.ward.dto.WardDTO;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -37,6 +38,9 @@ public class MedicalWardIdDTO {
 	@NotNull
 	@Schema(description = "The medical")
 	private MedicalDTO medical;
+
+	@Schema(description = "The lot: the stock of a ward is kept per lot")
+	private LotDTO lot;
 
 	public MedicalWardIdDTO() {
 	}
@@ -56,6 +60,14 @@ public class MedicalWardIdDTO {
 
 	public void setWard(WardDTO ward) {
 		this.ward = ward;
+	}
+
+	public LotDTO getLot() {
+		return this.lot;
+	}
+
+	public void setLot(LotDTO lot) {
+		this.lot = lot;
 	}
 
 	public void setMedical(MedicalDTO medical) {

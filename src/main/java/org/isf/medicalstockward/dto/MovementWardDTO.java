@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import jakarta.validation.constraints.NotNull;
 
 import org.isf.medical.dto.MedicalDTO;
+import org.isf.medicalstock.dto.LotDTO;
 import org.isf.patient.dto.PatientDTO;
 import org.isf.ward.dto.WardDTO;
 
@@ -78,6 +79,8 @@ public class MovementWardDTO {
 
 	@Schema(description = "The ward from which the movement is done")
 	private WardDTO wardFrom;
+	@Schema(description = "The lot the quantity is taken from (or given to): the stock of a ward is kept per lot")
+	private LotDTO lot;
 
 	public MovementWardDTO() {
 	}
@@ -202,5 +205,13 @@ public class MovementWardDTO {
 
 	public void setWardFrom(WardDTO wardFrom) {
 		this.wardFrom = wardFrom;
+	}
+
+	public LotDTO getLot() {
+		return this.lot;
+	}
+
+	public void setLot(LotDTO lot) {
+		this.lot = lot;
 	}
 }
