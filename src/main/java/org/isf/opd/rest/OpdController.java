@@ -190,9 +190,8 @@ public class OpdController {
 	@PutMapping("/opds/{code}")
 	public OpdDTO updateOpd(@PathVariable("code") int code, @RequestBody OpdDTO opdDTO) throws OHServiceException {
 		LOGGER.info("Update opds code: {}", opdDTO.getCode());
-		if (opdManager.getOpdById(code).isEmpty()) {
-			throw new OHAPIException(new OHExceptionMessage("Opd not found."), HttpStatus.NOT_FOUND);
-		}
+		Opd stored = opdManager.getOpdById(code)
+			.orElseThrow(() -> new OHAPIException(new OHExceptionMessage("Opd not found."), HttpStatus.NOT_FOUND));
 
 		if (opdDTO.getCode() != 0 && opdDTO.getCode() != code) {
 			throw new OHAPIException(new OHExceptionMessage("Opd not found."), HttpStatus.NOT_FOUND);
@@ -205,6 +204,8 @@ public class OpdController {
 
 		Opd opdToUpdate = mapper.map2Model(opdDTO);
 		opdToUpdate.setLock(opdDTO.getLock());
+		// the next visit is read-only in the DTO: keep the stored one
+		opdToUpdate.setNextVisit(stored.getNextVisit());
 		Opd updatedOpd = opdManager.updateOpd(opdToUpdate);
 		if (updatedOpd == null) {
 			throw new OHAPIException(new OHExceptionMessage("Opd not updated."));
@@ -226,9 +227,8 @@ public class OpdController {
 	) throws OHServiceException {
 		LOGGER.info("Update opds code: {}", code);
 		OpdWithOperationRowDTO opdWithOperatioRow = new OpdWithOperationRowDTO();
-		if (opdManager.getOpdById(code).isEmpty()) {
-			throw new OHAPIException(new OHExceptionMessage("Opd not found."), HttpStatus.NOT_FOUND);
-		}
+		Opd stored = opdManager.getOpdById(code)
+			.orElseThrow(() -> new OHAPIException(new OHExceptionMessage("Opd not found."), HttpStatus.NOT_FOUND));
 
 		if (opdWithOperationRowDTO.getOpdDTO().getCode() != 0 && opdWithOperationRowDTO.getOpdDTO().getCode() != code) {
 			throw new OHAPIException(new OHExceptionMessage("Opd not found."), HttpStatus.NOT_FOUND);
@@ -241,6 +241,7 @@ public class OpdController {
 
 		Opd opdToUpdate = mapper.map2Model(opdWithOperationRowDTO.getOpdDTO());
 		opdToUpdate.setLock(opdWithOperationRowDTO.getOpdDTO().getLock());
+		opdToUpdate.setNextVisit(stored.getNextVisit());
 		Opd updatedOpd = opdManager.updateOpd(opdToUpdate);
 		if (updatedOpd == null) {
 			throw new OHAPIException(new OHExceptionMessage("Opd not updated."));
@@ -390,8 +391,9 @@ public class OpdController {
 	public boolean deleteOpd(@PathVariable("code") int code) throws OHServiceException {
 		LOGGER.info("Delete Opd code: {}", code);
 
-		Opd toDelete = new Opd();
-		toDelete.setCode(code);
+		// the stored OPD, with its lock: a bare OPD with only the code fails once the OPD has been updated
+		Opd toDelete = opdManager.getOpdById(code)
+			.orElseThrow(() -> new OHAPIException(new OHExceptionMessage("Opd not found."), HttpStatus.NOT_FOUND));
 
 		try {
 			opdManager.deleteOpd(toDelete);

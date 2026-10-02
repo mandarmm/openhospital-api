@@ -42,7 +42,8 @@ public class OpdDTO {
 	@Schema(description = "The date of the admission", type = "string")
 	private LocalDateTime date;
 
-	@Schema(description = "The next visit date", type = "string")
+	@Schema(description = "The date of the next visit (read-only: the visit is managed through /visits)", type = "string",
+		accessMode = AccessMode.READ_ONLY)
 	private LocalDateTime nextVisitDate;
 
 	@Schema(description = "The admitted patient code")
