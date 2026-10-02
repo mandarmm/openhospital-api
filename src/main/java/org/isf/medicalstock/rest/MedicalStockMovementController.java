@@ -41,6 +41,7 @@ import org.isf.utils.exception.model.OHExceptionMessage;
 import org.isf.ward.model.Ward;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -233,5 +234,31 @@ public class MedicalStockMovementController {
 		}
 
 		return movInsertingManager.alertCriticalQuantity(med, specifiedQuantity);
+	}
+
+	/**
+	 * Deletes the last {@link Movement} of the main store (Swing's delete in the stock browser), with the reason kept
+	 * in the movements log. Only the last movement can be deleted: its code must be given, so that a movement saved
+	 * meanwhile is not deleted by mistake.
+	 *
+	 * @param code the code of the last movement
+	 * @param reason why it is deleted (required)
+	 * @return {@code true} if the movement has been deleted
+	 * @throws OHServiceException When failed to delete the movement
+	 */
+	@DeleteMapping("/medicalstockmovements/{code}")
+	public boolean deleteLastMovement(
+		@PathVariable("code") int code,
+		@RequestParam(name = "reason") String reason
+	) throws OHServiceException {
+		if (reason.isBlank()) {
+			throw new OHAPIException(new OHExceptionMessage("angal.medicalstock.deletemovementreasonrequired.msg"));
+		}
+		Movement last = movManager.getLastMovement();
+		if (last == null || last.getCode() != code) {
+			throw new OHAPIException(new OHExceptionMessage("Only the last movement can be deleted."));
+		}
+		movManager.deleteLastMovement(last, reason.trim());
+		return true;
 	}
 }
