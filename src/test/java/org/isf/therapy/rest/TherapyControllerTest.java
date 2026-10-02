@@ -103,7 +103,7 @@ class TherapyControllerTest {
 		ReflectionTestUtils.setField(therapyRowMapper, "modelMapper", modelMapper);
 		ReflectionTestUtils.setField(therapyRowMapper, "patientMapper", patientMapper);
 		this.mockMvc = MockMvcBuilders
-			.standaloneSetup(new TherapyController(managerMock, new TherapyMapper(), therapyRowMapper, new MedicalMapper(), repositoryMock, smsOperationsMock))
+			.standaloneSetup(new TherapyController(managerMock, new TherapyMapper(), therapyRowMapper, new MedicalMapper(new org.isf.medtype.mapper.MedicalTypeMapper()), repositoryMock, smsOperationsMock))
 			.setControllerAdvice(new OHResponseEntityExceptionHandler())
 			.build();
 		patient = PatientHelper.setup();
