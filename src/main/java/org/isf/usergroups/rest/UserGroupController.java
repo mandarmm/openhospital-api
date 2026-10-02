@@ -23,12 +23,16 @@ package org.isf.usergroups.rest;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import jakarta.validation.Valid;
 
 import org.isf.menu.manager.UserBrowsingManager;
 import org.isf.menu.model.UserGroup;
+import org.isf.menu.model.UserMenuItem;
 import org.isf.permissions.dto.PermissionDTO;
 import org.isf.permissions.manager.GroupPermissionManager;
 import org.isf.permissions.manager.PermissionManager;
@@ -36,6 +40,8 @@ import org.isf.permissions.mapper.PermissionMapper;
 import org.isf.permissions.model.GroupPermission;
 import org.isf.permissions.model.Permission;
 import org.isf.shared.exceptions.OHAPIException;
+import org.isf.usergroups.dto.GroupMenuItemDTO;
+import org.isf.usergroups.dto.GroupMenuSelectionDTO;
 import org.isf.usergroups.dto.GroupPermissionsDTO;
 import org.isf.usergroups.dto.UserGroupDTO;
 import org.isf.usergroups.mapper.UserGroupMapper;
@@ -65,6 +71,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @SecurityRequirement(name = "bearerAuth")
 @RequestMapping(produces = MediaType.APPLICATION_JSON_VALUE)
 public class UserGroupController {
+
+	private static final String ADMIN_GROUP = "admin";
+
+	/** Menu items the admin group cannot hide from itself (as in the Swing group menu editor). */
+	private static final Set<String> ADMIN_REQUIRED_ITEMS = Set.of("file", "groups", "users", "usersusers", "exit");
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(UserGroupController.class);
 
@@ -343,5 +354,67 @@ public class UserGroupController {
 		userGroupDTO.setPermissions(permissions);
 
 		return userGroupDTO;
+	}
+
+	/**
+	 * Returns the Swing menu as seen by a group: every menu item (the menu of the admin group) with {@code active}
+	 * telling whether the group sees it, as the Swing group menu editor shows it.
+	 *
+	 * @param code the group code
+	 * @return all menu items with the group's flags
+	 * @throws OHServiceException When failed to read the menu
+	 */
+	@GetMapping(value = "/usergroups/{group_code}/menu")
+	public List<GroupMenuItemDTO> getGroupMenu(@PathVariable("group_code") String code) throws OHServiceException {
+		UserGroup group = findGroup(code);
+		Map<String, Boolean> groupFlags = userManager.getGroupMenu(group).stream()
+			.collect(Collectors.toMap(UserMenuItem::getCode, UserMenuItem::isActive, (a, b) -> a));
+		return allMenuItems().stream()
+			.map(item -> new GroupMenuItemDTO(item.getCode(), item.getAltLabel(), item.getMySubmenu(), item.isASubMenu(),
+				item.getPosition(), groupFlags.getOrDefault(item.getCode(), false)))
+			.toList();
+	}
+
+	/**
+	 * Sets which Swing menu items a group sees. Items left out are hidden. The admin group always keeps the items
+	 * needed to manage users and to leave the application.
+	 *
+	 * @param code the group code
+	 * @param selection the menu item flags
+	 * @return the group's menu after the change
+	 * @throws OHServiceException When failed to update the menu
+	 */
+	@PutMapping(value = "/usergroups/{group_code}/menu")
+	public List<GroupMenuItemDTO> updateGroupMenu(@PathVariable("group_code") String code,
+		@RequestBody @Valid List<@Valid GroupMenuSelectionDTO> selection) throws OHServiceException {
+		UserGroup group = findGroup(code);
+		Map<String, Boolean> requested = selection.stream()
+			.collect(Collectors.toMap(GroupMenuSelectionDTO::code, GroupMenuSelectionDTO::active, (a, b) -> b));
+		List<UserMenuItem> allItems = allMenuItems();
+		Set<String> knownCodes = allItems.stream().map(UserMenuItem::getCode).collect(Collectors.toSet());
+		List<String> unknown = requested.keySet().stream().filter(itemCode -> !knownCodes.contains(itemCode)).toList();
+		if (!unknown.isEmpty()) {
+			throw new OHAPIException(new OHExceptionMessage("Unknown menu items: " + String.join(", ", unknown)));
+		}
+		boolean admin = ADMIN_GROUP.equals(group.getCode());
+		for (UserMenuItem item : allItems) {
+			item.setActive((admin && ADMIN_REQUIRED_ITEMS.contains(item.getCode())) || requested.getOrDefault(item.getCode(), false));
+		}
+		LOGGER.info("Updating the menu of user group {}.", code);
+		userManager.setGroupMenu(group, allItems);
+		return getGroupMenu(code);
+	}
+
+	/** The complete menu: the admin group has every item. */
+	private List<UserMenuItem> allMenuItems() throws OHServiceException {
+		return userManager.getGroupMenu(new UserGroup(ADMIN_GROUP, ""));
+	}
+
+	private UserGroup findGroup(String code) throws OHAPIException {
+		UserGroup group = userManager.findUserGroupByCode(code);
+		if (group == null) {
+			throw new OHAPIException(new OHExceptionMessage("User group not found."), HttpStatus.NOT_FOUND);
+		}
+		return group;
 	}
 }
