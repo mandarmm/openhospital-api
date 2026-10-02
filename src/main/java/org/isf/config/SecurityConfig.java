@@ -206,6 +206,9 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.GET, "/stockmovements/**").hasAuthority("medicalstockmovements.read")
 				.requestMatchers(HttpMethod.PUT, "/stockmovements/**").hasAuthority("medicalstockmovements.update")
 				.requestMatchers(HttpMethod.DELETE, "/stockmovements/**").hasAuthority("medicalstockmovements.delete")
+				// medicalinventories: OH has no inventory permission; the controller checks the main store or the ward stock
+				// permissions according to the inventory's type
+				.requestMatchers("/medicalinventories/**").authenticated()
 				// medicalstockward
 				.requestMatchers(HttpMethod.POST, "/medicalstockward/**").hasAuthority("medicalstockward.create")
 				.requestMatchers(HttpMethod.GET, "/medicalstockward/**").hasAuthority("medicalstockward.read")
