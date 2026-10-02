@@ -22,6 +22,7 @@
 package org.isf.medstockmovtype.dto;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -38,6 +39,11 @@ public class MovementTypeDTO {
 	@NotNull
 	@Schema(description = "Type of the movement type", example = "-")
 	private String type;
+
+	@Pattern(regexp = "operational|non-operational")
+	@Schema(description = "Category of the movement type; 'operational' when omitted on creation, unchanged when omitted on update",
+		example = "operational", allowableValues = { "operational", "non-operational" })
+	private String category;
 
 	public MovementTypeDTO() {
 	}
@@ -75,5 +81,13 @@ public class MovementTypeDTO {
 
 	public void setType(String type) {
 		this.type = type;
+	}
+
+	public String getCategory() {
+		return this.category;
+	}
+
+	public void setCategory(String category) {
+		this.category = category;
 	}
 }
