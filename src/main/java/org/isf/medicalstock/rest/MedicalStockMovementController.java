@@ -44,6 +44,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -233,5 +234,25 @@ public class MedicalStockMovementController {
 		}
 
 		return movInsertingManager.alertCriticalQuantity(med, specifiedQuantity);
+	}
+
+	/**
+	 * Updates a lot's dates and cost (Swing's lot management).
+	 *
+	 * @param code the lot's code
+	 * @param lotDTO the dates and the cost; the code and the quantities are not changed
+	 * @return the updated lot
+	 * @throws OHServiceException When failed to update the lot
+	 */
+	@PutMapping("/medicalstockmovements/lot/{code}")
+	public LotDTO updateLot(@PathVariable("code") String code, @RequestBody LotDTO lotDTO) throws OHServiceException {
+		Lot lot = movInsertingManager.getLot(code);
+		if (lot == null) {
+			throw new OHAPIException(new OHExceptionMessage("Lot not found."), HttpStatus.NOT_FOUND);
+		}
+		lot.setPreparationDate(lotDTO.getPreparationDate() == null ? null : lotDTO.getPreparationDate().atStartOfDay());
+		lot.setDueDate(lotDTO.getDueDate() == null ? null : lotDTO.getDueDate().atStartOfDay());
+		lot.setCost(lotDTO.getCost());
+		return lotMapper.map2DTO(movInsertingManager.updateLot(lot));
 	}
 }

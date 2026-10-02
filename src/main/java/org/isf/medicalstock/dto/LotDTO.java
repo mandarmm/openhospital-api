@@ -27,6 +27,7 @@ import java.time.LocalDate;
 import jakarta.validation.constraints.NotNull;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.Schema.AccessMode;
 
 public class LotDTO {
 
@@ -44,6 +45,10 @@ public class LotDTO {
 
 	@Schema(description = "The lot's code", example = "750")
 	private BigDecimal cost;
+	@Schema(description = "The quantity in the main store, when the lot is read with its quantities", accessMode = AccessMode.READ_ONLY)
+	private Integer mainStoreQuantity;
+	@Schema(description = "The quantity in the wards, when the lot is read with its quantities", accessMode = AccessMode.READ_ONLY)
+	private Double wardsTotalQuantity;
 
 	public LotDTO() {
 	}
@@ -85,5 +90,21 @@ public class LotDTO {
 
 	public void setCost(BigDecimal cost) {
 		this.cost = cost;
+	}
+
+	public Integer getMainStoreQuantity() {
+		return mainStoreQuantity;
+	}
+
+	public void setMainStoreQuantity(Integer mainStoreQuantity) {
+		this.mainStoreQuantity = mainStoreQuantity;
+	}
+
+	public Double getWardsTotalQuantity() {
+		return wardsTotalQuantity;
+	}
+
+	public void setWardsTotalQuantity(Double wardsTotalQuantity) {
+		this.wardsTotalQuantity = wardsTotalQuantity;
 	}
 }
