@@ -34,6 +34,8 @@ import org.isf.utils.exception.OHReportException;
 import org.isf.utils.exception.OHServiceException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -44,57 +46,67 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @RestControllerAdvice
 public class OHResponseEntityExceptionHandler extends ResponseEntityExceptionHandler {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(OHResponseEntityExceptionHandler.class);
+
     @ExceptionHandler(value = {OHDataValidationException.class})
     protected ResponseEntity<Object> handleOHServiceValidationException(OHServiceException ex) {
-        return buildResponseEntity(new OHAPIError(HttpStatus.BAD_REQUEST, ex));
+        return buildResponseEntity(new OHAPIError(HttpStatus.BAD_REQUEST, ex), ex);
     }
 
     @ExceptionHandler(value = {OHServiceException.class})
     protected ResponseEntity<Object> handleOHServiceException(OHServiceException ex) {
-        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex));
+        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex), ex);
     }
 
     @ExceptionHandler(value = {OHReportException.class})
     protected ResponseEntity<Object> handleReportException(OHReportException ex, Locale locale) {
-        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex));
+        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex), ex);
     }
 
     @ExceptionHandler(value = {OHInvalidSQLException.class})
     protected ResponseEntity<Object> handleInvalidSqlException(OHInvalidSQLException ex, Locale locale) {
-        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex));
+        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex), ex);
     }
 
     @ExceptionHandler(value = {OHOperationNotAllowedException.class})
     protected ResponseEntity<Object> handleOHServiceOperationNotAllowedException(OHOperationNotAllowedException ex, Locale locale) {
-        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex));
+        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex), ex);
     }
 
     @ExceptionHandler(value = {OHDicomException.class})
     protected ResponseEntity<Object> handleDicomException(OHDicomException ex, Locale locale) {
-        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex));
+        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex), ex);
     }
 
     @ExceptionHandler(value = {OHDBConnectionException.class})
     protected ResponseEntity<Object> handleDbConnectionException(OHDBConnectionException ex, Locale locale) {
-        return buildResponseEntity(new OHAPIError(HttpStatus.SERVICE_UNAVAILABLE, ex));
+        return buildResponseEntity(new OHAPIError(HttpStatus.SERVICE_UNAVAILABLE, ex), ex);
     }
 
     @ExceptionHandler(value = {OHDataIntegrityViolationException.class})
     protected ResponseEntity<Object> handleDataIntegrityViolationException(OHDataIntegrityViolationException ex, Locale locale) {
-        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex));
+        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex), ex);
     }
 
     @ExceptionHandler(value = {OHDataLockFailureException.class})
     protected ResponseEntity<Object> handleDbLockFailureException(OHDataLockFailureException ex, Locale locale) {
-        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex));
+        return buildResponseEntity(new OHAPIError(HttpStatus.INTERNAL_SERVER_ERROR, ex), ex);
     }
 
     @ExceptionHandler(value = {OHAPIException.class})
     protected ResponseEntity<Object> handleOHAPIException(OHAPIException ex) {
-        return buildResponseEntity(new OHAPIError(ex.getStatus(), ex));
+        return buildResponseEntity(new OHAPIError(ex.getStatus(), ex), ex);
     }
 
-    private ResponseEntity<Object> buildResponseEntity(OHAPIError apiError) {
+    /**
+     * The response carries the error messages only; the stack trace stays in the server log.
+     */
+    private ResponseEntity<Object> buildResponseEntity(OHAPIError apiError, Exception ex) {
+        if (apiError.getStatus().is5xxServerError()) {
+            LOGGER.error("Request failed: {}", apiError.getDebugMessage(), ex);
+        } else {
+            LOGGER.warn("Request rejected ({}): {}", apiError.getStatus(), apiError.getDebugMessage());
+        }
         return new ResponseEntity<>(apiError, apiError.getStatus());
     }
 }
