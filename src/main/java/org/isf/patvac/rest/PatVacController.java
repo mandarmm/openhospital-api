@@ -142,8 +142,8 @@ public class PatVacController {
 	 */
 	@GetMapping("/patientvaccines/filter")
 	public List<PatientVaccineDTO> getPatientVaccinesByDatesRanges(
-		@RequestParam String vaccineTypeCode,
-		@RequestParam String vaccineCode,
+		@RequestParam(required = false) String vaccineTypeCode,
+		@RequestParam(required = false) String vaccineCode,
 		@RequestParam LocalDate dateFrom,
 		@RequestParam LocalDate dateTo,
 		@RequestParam char sex,
@@ -153,8 +153,9 @@ public class PatVacController {
 		LOGGER.info("filter patient vaccine by dates ranges");
 
 		// the whole "to" day: its vaccinations were left out
+		// an empty type or vaccine means all (the core filters on null), not the code ""
 		return mapper.map2DTOList(patVacManager.getPatientVaccine(
-			vaccineTypeCode, vaccineCode, dateFrom.atStartOfDay(), dateTo.atTime(LocalTime.MAX), sex, ageFrom, ageTo
+			blankToNull(vaccineTypeCode), blankToNull(vaccineCode), dateFrom.atStartOfDay(), dateTo.atTime(LocalTime.MAX), sex, ageFrom, ageTo
 		));
 	}
 
@@ -196,6 +197,10 @@ public class PatVacController {
 	@GetMapping("/patientvaccines/patient/{patientCode}")
 	public List<PatientVaccineDTO> getPatientVaccinesOfPatient(@PathVariable int patientCode) throws OHServiceException {
 		return mapper.map2DTOList(patVacIoOperations.findForPatient(patientCode));
+	}
+
+	private static String blankToNull(String value) {
+		return value == null || value.isBlank() ? null : value;
 	}
 
 	/**

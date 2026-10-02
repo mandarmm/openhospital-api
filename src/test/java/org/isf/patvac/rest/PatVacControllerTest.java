@@ -26,7 +26,6 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyChar;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -177,13 +176,14 @@ class PatVacControllerTest {
 
 	@Test
 	void testFilter_includesTheLastDay() throws Exception {
-		when(patVacManagerMock.getPatientVaccine(anyString(), anyString(), any(), any(), anyChar(), anyInt(), anyInt())).thenReturn(List.of());
+		when(patVacManagerMock.getPatientVaccine(any(), any(), any(), any(), anyChar(), anyInt(), anyInt())).thenReturn(List.of());
 
 		this.mockMvc.perform(get("/patientvaccines/filter").param("vaccineTypeCode", "").param("vaccineCode", "")
 				.param("dateFrom", "2026-10-01").param("dateTo", "2026-10-02").param("sex", "A").param("ageFrom", "0").param("ageTo", "200"))
 			.andExpect(status().isOk());
 
-		verify(patVacManagerMock).getPatientVaccine(eq(""), eq(""), eq(LocalDate.of(2026, 10, 1).atStartOfDay()),
+		// empty: all types and vaccines
+		verify(patVacManagerMock).getPatientVaccine(eq(null), eq(null), eq(LocalDate.of(2026, 10, 1).atStartOfDay()),
 			eq(LocalDate.of(2026, 10, 2).atTime(LocalTime.MAX)), eq('A'), eq(0), eq(200));
 	}
 }
