@@ -43,7 +43,7 @@ public class ExamDTO {
 	private ExamTypeDTO examtype;
 
 	@Schema(description = "Lock", example = "0")
-	private int lock;
+	private Integer lock;
 
 	public String getCode() {
 		return this.code;
@@ -85,11 +85,11 @@ public class ExamDTO {
 		this.examtype = examtype;
 	}
 
-	public int getLock() {
+	public Integer getLock() {
 		return lock;
 	}
 
-	public void setLock(int lock) {
+	public void setLock(Integer lock) {
 		this.lock = lock;
 	}
 
