@@ -38,6 +38,7 @@ import org.isf.patient.mapper.PatientMapper;
 import org.isf.patient.model.Patient;
 import org.isf.shared.exceptions.OHAPIException;
 import org.isf.shared.pagination.Page;
+import org.isf.shared.pagination.PageInfoDTO;
 import org.isf.utils.exception.OHServiceException;
 import org.isf.utils.exception.model.OHExceptionMessage;
 import org.isf.utils.pagination.PagedResponse;
@@ -70,6 +71,8 @@ public class PatientController {
 
 	// TODO: to centralize
 	protected static final String DEFAULT_PAGE_SIZE = "80";
+
+	private static final int MAX_FIND_PAGE_SIZE = 200;
 
 	private final PatientBrowserManager patientManager;
 
@@ -180,6 +183,63 @@ public class PatientController {
 		Boolean status = admission != null;
 
 		return patientMapper.map2DTOWS(patient, status);
+	}
+
+	/**
+	 * Finds patients for the reception desk: every word of {@code q} must be found in the code, first or second name,
+	 * city, address, telephone, note or tax code (the Swing "search key"); newest patients first. Without {@code q},
+	 * all patients are paged. The photo is left out (see {@code GET /patients/{code}}); {@code status} tells whether
+	 * the patient is currently admitted.
+	 * @param q the words to search for
+	 * @param page the page, from 0
+	 * @param size the page size, 1 to 200
+	 * @return the page of patients
+	 * @throws OHServiceException When failed to search patients
+	 */
+	@GetMapping(value = "/patients/find")
+	public Page<PatientDTO> findPatients(
+		@RequestParam(value = "q", required = false, defaultValue = "") String q,
+		@RequestParam(value = "page", required = false, defaultValue = "0") int page,
+		@RequestParam(value = "size", required = false, defaultValue = "20") int size
+	) throws OHServiceException {
+		if (page < 0 || size < 1 || size > MAX_FIND_PAGE_SIZE) {
+			throw new OHAPIException(new OHExceptionMessage("Invalid page or size."));
+		}
+		List<Patient> patients;
+		PageInfoDTO pageInfo;
+		if (q.isBlank()) {
+			PagedResponse<Patient> paged = patientManager.getPatientsPageable(page, size);
+			patients = paged.getData();
+			pageInfo = patientMapper.setParameterPageInfo(paged.getPageInfo());
+		} else {
+			// the search is not paged in the core: page the matches here (a search returns few patients)
+			List<Patient> matches = patientManager.getPatientsByOneOfFieldsLike(q.trim());
+			int from = Math.min(page * size, matches.size());
+			int to = Math.min(from + size, matches.size());
+			patients = matches.subList(from, to);
+			pageInfo = pageInfo(page, size, patients.size(), matches.size());
+		}
+		Page<PatientDTO> result = new Page<>();
+		result.setData(patients.stream().map(patient -> {
+			PatientDTO dto = patientMapper.map2DTOWS(patient, admissionManager.getCurrentAdmission(patient) != null);
+			dto.setBlobPhoto(null);
+			return dto;
+		}).toList());
+		result.setPageInfo(pageInfo);
+		return result;
+	}
+
+	private static PageInfoDTO pageInfo(int page, int size, int elements, long total) {
+		PageInfoDTO pageInfo = new PageInfoDTO();
+		pageInfo.setPage(page);
+		pageInfo.setSize(size);
+		pageInfo.setNbOfElements(elements);
+		pageInfo.setTotalNbOfElements(total);
+		long totalPages = (total + size - 1) / size;
+		pageInfo.setTotalPages(totalPages);
+		pageInfo.setHasPreviousPage(page > 0);
+		pageInfo.setHasNextPage(page + 1 < totalPages);
+		return pageInfo;
 	}
 
 	@GetMapping(value = "/patients/search")
