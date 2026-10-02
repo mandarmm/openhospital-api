@@ -22,6 +22,7 @@
 package org.isf.sms.rest;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 import jakarta.validation.Valid;
@@ -78,9 +79,10 @@ public class SmsController {
 	) throws OHServiceException {
 		LOGGER.info("Fetching the list of sms");
 
+		// both days are included: dateTo covers its whole day, as in the Swing SMS manager
 		return smsMapper.map2DTOList(smsManager.getAll(
 			LocalDate.parse(dateFrom).atStartOfDay(),
-			LocalDate.parse(dateTo).atStartOfDay()
+			LocalDate.parse(dateTo).atTime(LocalTime.MAX)
 		));
 	}
 
