@@ -21,12 +21,20 @@
  */
 package org.isf.opd.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.log;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.isf.opd.data.OpdHelper;
 import org.isf.opd.dto.OpdDTO;
@@ -41,10 +49,12 @@ import org.isf.patient.model.Patient;
 import org.isf.shared.exceptions.OHResponseEntityExceptionHandler;
 import org.isf.shared.mapper.converter.BlobToByteArrayConverter;
 import org.isf.shared.mapper.converter.ByteArrayToBlobConverter;
+import org.isf.visits.model.Visit;
 import org.isf.ward.manager.WardBrowserManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.modelmapper.ModelMapper;
@@ -125,6 +135,77 @@ class OpdControllerTest {
 			.andReturn();
 
 		LOGGER.debug("result: {}", result);
+	}
+
+	@Test
+	void testOpdNumberAndNextVisitDateMapping() throws Exception {
+		Opd opd = OpdHelper.setup();
+		opd.setProgYear(42);
+		Visit nextVisit = new Visit();
+		LocalDateTime nextVisitDate = LocalDateTime.of(2026, 10, 9, 10, 30);
+		nextVisit.setDate(nextVisitDate);
+		opd.setNextVisit(nextVisit);
+
+		OpdDTO dto = opdMapper.map2DTO(opd);
+		assertThat(dto.getProg_year()).isEqualTo(42);
+		assertThat(dto.getNextVisitDate()).isEqualTo(nextVisitDate);
+
+		// the OPD number is kept; the next visit date is read-only and does not fail the mapping
+		Opd model = opdMapper.map2Model(dto);
+		assertThat(model.getProgYear()).isEqualTo(42);
+		assertThat(model.getNextVisit()).isNull();
+	}
+
+	@Test
+	void testUpdateOpd_keepsStoredNextVisit() throws Exception {
+		int code = 5;
+		Patient patient = PatientHelper.setup();
+		patient.setCode(1);
+		Opd stored = OpdHelper.setup();
+		stored.setCode(code);
+		stored.setPatient(patient);
+		Visit nextVisit = new Visit();
+		nextVisit.setDate(LocalDateTime.of(2026, 10, 9, 10, 30));
+		stored.setNextVisit(nextVisit);
+		OpdDTO body = opdMapper.map2DTO(stored);
+
+		when(opdBrowserManagerMock.getOpdById(code)).thenReturn(Optional.of(stored));
+		when(patientBrowserManagerMock.getPatientById(1)).thenReturn(patient);
+		when(opdBrowserManagerMock.updateOpd(any(Opd.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		this.mockMvc
+			.perform(put("/opds/{code}", code)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(Objects.requireNonNull(OpdHelper.asJsonString(body))))
+			.andExpect(status().isOk());
+
+		ArgumentCaptor<Opd> updated = ArgumentCaptor.forClass(Opd.class);
+		verify(opdBrowserManagerMock).updateOpd(updated.capture());
+		assertThat(updated.getValue().getNextVisit()).isSameAs(nextVisit);
+	}
+
+	@Test
+	void testDeleteOpd_deletesStoredOpd() throws Exception {
+		int code = 5;
+		Opd stored = OpdHelper.setup();
+		stored.setCode(code);
+		stored.setLock(2);
+		when(opdBrowserManagerMock.getOpdById(code)).thenReturn(Optional.of(stored));
+
+		this.mockMvc.perform(delete("/opds/{code}", code))
+			.andExpect(status().isOk());
+
+		verify(opdBrowserManagerMock).deleteOpd(stored);
+	}
+
+	@Test
+	void testDeleteOpd_404() throws Exception {
+		when(opdBrowserManagerMock.getOpdById(5)).thenReturn(Optional.empty());
+
+		this.mockMvc.perform(delete("/opds/{code}", 5))
+			.andExpect(status().isNotFound());
+
+		verify(opdBrowserManagerMock, never()).deleteOpd(any(Opd.class));
 	}
 
 }
