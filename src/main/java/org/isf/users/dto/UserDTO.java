@@ -21,9 +21,13 @@
  */
 package org.isf.users.dto;
 
+import java.time.LocalDateTime;
+
 import jakarta.validation.constraints.NotNull;
 
 import org.isf.usergroups.dto.UserGroupDTO;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -45,6 +49,24 @@ public class UserDTO {
 	private String desc;
 	@Schema(description = "Whether the user has been soft deleted or not", example = "false")
 	private boolean deleted;
+
+	@JsonProperty(access = JsonProperty.Access.READ_ONLY)
+	@Schema(description = "Whether the account is locked after too many failed logins (read-only; see POST /users/{username}/unlock)",
+		example = "false", accessMode = Schema.AccessMode.READ_ONLY)
+	private Boolean accountLocked;
+
+	@JsonProperty(access = JsonProperty.Access.READ_ONLY)
+	@Schema(description = "Failed login attempts since the last successful login (read-only)", example = "0",
+		accessMode = Schema.AccessMode.READ_ONLY)
+	private Integer failedAttempts;
+
+	@JsonProperty(access = JsonProperty.Access.READ_ONLY)
+	@Schema(description = "When the account was locked (read-only)", accessMode = Schema.AccessMode.READ_ONLY)
+	private LocalDateTime lockedTime;
+
+	@JsonProperty(access = JsonProperty.Access.READ_ONLY)
+	@Schema(description = "Last successful login (read-only)", accessMode = Schema.AccessMode.READ_ONLY)
+	private LocalDateTime lastLogin;
 
 	public UserDTO() {
 	}
@@ -92,5 +114,37 @@ public class UserDTO {
 	
 	public void setDeleted(boolean deleted) {
 		this.deleted = deleted;
+	}
+
+	public Boolean getAccountLocked() {
+		return accountLocked;
+	}
+
+	public void setAccountLocked(Boolean accountLocked) {
+		this.accountLocked = accountLocked;
+	}
+
+	public Integer getFailedAttempts() {
+		return failedAttempts;
+	}
+
+	public void setFailedAttempts(Integer failedAttempts) {
+		this.failedAttempts = failedAttempts;
+	}
+
+	public LocalDateTime getLockedTime() {
+		return lockedTime;
+	}
+
+	public void setLockedTime(LocalDateTime lockedTime) {
+		this.lockedTime = lockedTime;
+	}
+
+	public LocalDateTime getLastLogin() {
+		return lastLogin;
+	}
+
+	public void setLastLogin(LocalDateTime lastLogin) {
+		this.lastLogin = lastLogin;
 	}
 }

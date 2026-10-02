@@ -273,6 +273,7 @@ public class SecurityConfig {
 				// user
 				.requestMatchers("/users/me").authenticated()
 				.requestMatchers(HttpMethod.POST, "/users").hasAuthority("users.create")
+				.requestMatchers(HttpMethod.POST, "/users/{username}/unlock").hasAuthority("users.update")
 				.requestMatchers(HttpMethod.GET, "/users/**").hasAuthority("users.read")
 				.requestMatchers(HttpMethod.PUT, "/users/{username}").hasAuthority("users.update")
 				.requestMatchers(HttpMethod.DELETE, "/users/**").hasAuthority("users.delete")
