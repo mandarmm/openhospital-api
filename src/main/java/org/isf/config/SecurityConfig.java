@@ -284,6 +284,8 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/dicomtypes/**").hasAuthority("admin.access")
 				.requestMatchers(HttpMethod.PUT, "/dicomtypes/**").hasAuthority("admin.access")
 				.requestMatchers(HttpMethod.DELETE, "/dicomtypes/**").hasAuthority("admin.access")
+				// telemetry: an administration task (there is no telemetry permission)
+				.requestMatchers("/telemetry/**").hasAuthority("admin.access")
 				// pregnanttreatmenttypes
 				.requestMatchers(HttpMethod.POST, "/pregnanttreatmenttypes/**").hasAuthority("pregnanttreatmenttypes.create")
 				.requestMatchers(HttpMethod.GET, "/pregnanttreatmenttypes/**").hasAnyAuthority("pregnanttreatmenttypes.read")
