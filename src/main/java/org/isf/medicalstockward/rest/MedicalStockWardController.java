@@ -45,6 +45,7 @@ import org.isf.ward.manager.WardBrowserManager;
 import org.isf.ward.model.Ward;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -207,6 +208,36 @@ public class MedicalStockWardController {
 		MovementWard newMovement = movementWardMapper.map2Model(newMovementDTO);
 		movWardBrowserManager.newMovementWard(newMovement);
 
+		return true;
+	}
+
+	/**
+	 * Deletes the last movement of a ward (Swing's delete in the ward pharmacy), with the reason kept in the ward
+	 * movements log. Only the ward's last movement can be deleted: its code must be given, so that a movement saved
+	 * meanwhile is not deleted by mistake.
+	 *
+	 * @param wardId the ward
+	 * @param code the code of the ward's last movement
+	 * @param reason why it is deleted (required)
+	 * @return {@code true} if the movement has been deleted
+	 * @throws OHServiceException When failed to delete the movement
+	 */
+	@DeleteMapping("/medicalstockward/movements/{ward_code}/{code}")
+	public boolean deleteLastMovementWard(
+		@PathVariable("ward_code") String wardId,
+		@PathVariable("code") int code,
+		@RequestParam("reason") String reason
+	) throws OHServiceException {
+		if (reason.isBlank()) {
+			throw new OHAPIException(new OHExceptionMessage("angal.medicalstock.deletemovementreasonrequired.msg"));
+		}
+		Ward ward = wardManager.getWards().stream().filter(w -> w.getCode().equals(wardId)).findFirst()
+			.orElseThrow(() -> new OHAPIException(new OHExceptionMessage("Ward not found."), HttpStatus.NOT_FOUND));
+		MovementWard last = movWardBrowserManager.getLastMovementWard(ward);
+		if (last == null || last.getCode() != code) {
+			throw new OHAPIException(new OHExceptionMessage("angal.medicalstock.onlythelastmovementcanbedeleted.msg"));
+		}
+		movWardBrowserManager.deleteLastMovementWard(last, reason.trim());
 		return true;
 	}
 }
