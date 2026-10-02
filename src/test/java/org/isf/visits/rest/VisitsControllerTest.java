@@ -21,7 +21,12 @@
  */
 package org.isf.visits.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -33,6 +38,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 import java.util.Objects;
 
+import org.isf.patient.manager.PatientBrowserManager;
+import org.isf.patient.model.Patient;
 import org.isf.shared.exceptions.OHResponseEntityExceptionHandler;
 import org.isf.shared.mapper.converter.BlobToByteArrayConverter;
 import org.isf.shared.mapper.converter.ByteArrayToBlobConverter;
@@ -45,6 +52,7 @@ import org.isf.visits.model.Visit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.modelmapper.ModelMapper;
@@ -65,6 +73,9 @@ class VisitsControllerTest {
 
 	protected VisitMapper visitMapper = new VisitMapper();
 
+	@Mock
+	protected PatientBrowserManager patientManagerMock;
+
 	private MockMvc mockMvc;
 
 	private AutoCloseable closeable;
@@ -73,7 +84,7 @@ class VisitsControllerTest {
 	void setup() {
 		closeable = MockitoAnnotations.openMocks(this);
 		this.mockMvc = MockMvcBuilders
-				.standaloneSetup(new VisitsController(visitManagerMock, visitMapper))
+				.standaloneSetup(new VisitsController(visitManagerMock, visitMapper, patientManagerMock))
 				.setControllerAdvice(new OHResponseEntityExceptionHandler())
 				.build();
 		ModelMapper modelMapper = new ModelMapper();
@@ -115,7 +126,9 @@ class VisitsControllerTest {
 	void testNewVisit_201() throws Exception {
 		String request = "/visits";
 		int id = 1;
-		VisitDTO body = visitMapper.map2DTO(VisitHelper.setup(id));
+		Visit visit = VisitHelper.setup(id);
+		VisitDTO body = visitMapper.map2DTO(visit);
+		when(patientManagerMock.getPatientById(any())).thenReturn(visit.getPatient());
 
 		when(visitManagerMock.newVisit(visitMapper.map2Model(body)))
 				.thenReturn(visitMapper.map2Model(body));
@@ -177,6 +190,64 @@ class VisitsControllerTest {
 				.andReturn();
 
 		LOGGER.debug("result: {}", result);
+	}
+
+	@Test
+	void testNewVisit_usesStoredPatient() throws Exception {
+		Visit visit = VisitHelper.setup(1);
+		Patient stored = visit.getPatient();
+		VisitDTO body = visitMapper.map2DTO(visit);
+		// a payload carrying only the patient's code
+		body.getPatient().setFirstName(null);
+		body.getPatient().setSex(' ');
+		when(patientManagerMock.getPatientById(any())).thenReturn(stored);
+		when(visitManagerMock.newVisit(any(Visit.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		this.mockMvc
+				.perform(post("/visits")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(Objects.requireNonNull(VisitHelper.asJsonString(body))))
+				.andExpect(status().isCreated());
+
+		ArgumentCaptor<Visit> created = ArgumentCaptor.forClass(Visit.class);
+		verify(visitManagerMock).newVisit(created.capture());
+		assertThat(created.getValue().getPatient()).isSameAs(stored);
+	}
+
+	@Test
+	void testNewVisit_unknownPatient_404() throws Exception {
+		VisitDTO body = visitMapper.map2DTO(VisitHelper.setup(1));
+		when(patientManagerMock.getPatientById(any())).thenReturn(null);
+
+		this.mockMvc
+				.perform(post("/visits")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(Objects.requireNonNull(VisitHelper.asJsonString(body))))
+				.andExpect(status().isNotFound());
+
+		verify(visitManagerMock, never()).newVisit(any(Visit.class));
+	}
+
+	@Test
+	void testDeleteVisit_200() throws Exception {
+		Visit visit = VisitHelper.setup(7);
+		when(visitManagerMock.findVisit(7)).thenReturn(visit);
+
+		this.mockMvc.perform(delete("/visits/{visitID}", 7))
+				.andExpect(status().isOk())
+				.andExpect(content().string("true"));
+
+		verify(visitManagerMock).deleteVisit(visit);
+	}
+
+	@Test
+	void testDeleteVisit_404() throws Exception {
+		when(visitManagerMock.findVisit(anyInt())).thenReturn(null);
+
+		this.mockMvc.perform(delete("/visits/{visitID}", 7))
+				.andExpect(status().isNotFound());
+
+		verify(visitManagerMock, never()).deleteVisit(any(Visit.class));
 	}
 
 }
