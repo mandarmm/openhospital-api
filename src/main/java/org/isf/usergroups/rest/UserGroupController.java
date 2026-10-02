@@ -22,6 +22,7 @@
 package org.isf.usergroups.rest;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -76,6 +77,11 @@ public class UserGroupController {
 
 	/** Menu items the admin group cannot hide from itself (as in the Swing group menu editor). */
 	private static final Set<String> ADMIN_REQUIRED_ITEMS = Set.of("file", "groups", "users", "usersusers", "exit");
+
+	/** Stable order: by parent menu, then position, then id (the menu query has no order). */
+	private static final Comparator<UserMenuItem> MENU_ORDER = Comparator.comparing(UserMenuItem::getMySubmenu, Comparator.nullsFirst(Comparator.naturalOrder()))
+		.thenComparingInt(UserMenuItem::getPosition)
+		.thenComparing(UserMenuItem::getCode);
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(UserGroupController.class);
 
@@ -370,6 +376,7 @@ public class UserGroupController {
 		Map<String, Boolean> groupFlags = userManager.getGroupMenu(group).stream()
 			.collect(Collectors.toMap(UserMenuItem::getCode, UserMenuItem::isActive, (a, b) -> a));
 		return allMenuItems().stream()
+			.sorted(MENU_ORDER)
 			.map(item -> new GroupMenuItemDTO(item.getCode(), item.getAltLabel(), item.getMySubmenu(), item.isASubMenu(),
 				item.getPosition(), groupFlags.getOrDefault(item.getCode(), false)))
 			.toList();
