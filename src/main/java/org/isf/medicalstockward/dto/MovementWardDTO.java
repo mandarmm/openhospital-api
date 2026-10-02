@@ -31,6 +31,8 @@ import org.isf.medicalstock.dto.LotDTO;
 import org.isf.patient.dto.PatientDTO;
 import org.isf.ward.dto.WardDTO;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public class MovementWardDTO {
@@ -115,10 +117,16 @@ public class MovementWardDTO {
 		return this.date;
 	}
 
+	/*
+	 * "isPatient" in JSON: as a bean property the flag is also called "patient", like the patient itself, so a movement
+	 * to a patient could not be read ("Failed to read request").
+	 */
+	@JsonProperty("isPatient")
 	public boolean isPatient() {
 		return this.isPatient;
 	}
 
+	@JsonProperty("patient")
 	public PatientDTO getPatient() {
 		return this.patient;
 	}
@@ -167,10 +175,12 @@ public class MovementWardDTO {
 		this.date = date;
 	}
 
+	@JsonProperty("isPatient")
 	public void setPatient(boolean isPatient) {
 		this.isPatient = isPatient;
 	}
 
+	@JsonProperty("patient")
 	public void setPatient(PatientDTO patient) {
 		this.patient = patient;
 	}
