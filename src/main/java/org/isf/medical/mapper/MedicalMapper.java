@@ -21,6 +21,8 @@
  */
 package org.isf.medical.mapper;
 
+import java.util.List;
+
 import org.isf.medical.dto.MedicalDTO;
 import org.isf.medicals.model.Medical;
 import org.isf.shared.GenericMapper;
@@ -33,4 +35,32 @@ public class MedicalMapper extends GenericMapper<Medical, MedicalDTO> {
 		super(Medical.class, MedicalDTO.class);
 	}
 
+	/*
+	 * The product code is "prod_code" in the DTO and "prodCode" in the model, so the implicit mapping lost it: every
+	 * medical was returned without its code, and creating or updating one failed with an error 500 in the validation.
+	 */
+
+	@Override
+	public MedicalDTO map2DTO(Medical medical) {
+		MedicalDTO dto = super.map2DTO(medical);
+		dto.setProd_code(medical.getProdCode());
+		return dto;
+	}
+
+	@Override
+	public Medical map2Model(MedicalDTO dto) {
+		Medical medical = super.map2Model(dto);
+		medical.setProdCode(dto.getProd_code() == null ? "" : dto.getProd_code());
+		return medical;
+	}
+
+	@Override
+	public List<MedicalDTO> map2DTOList(List<Medical> list) {
+		return list.stream().map(this::map2DTO).toList();
+	}
+
+	@Override
+	public List<Medical> map2ModelList(List<MedicalDTO> list) {
+		return list.stream().map(this::map2Model).toList();
+	}
 }
