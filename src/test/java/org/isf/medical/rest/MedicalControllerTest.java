@@ -39,6 +39,7 @@ import org.isf.medical.dto.MedicalDTO;
 import org.isf.medical.mapper.MedicalMapper;
 import org.isf.medicals.manager.MedicalBrowsingManager;
 import org.isf.medicals.model.Medical;
+import org.isf.medtype.mapper.MedicalTypeMapper;
 import org.isf.medtype.model.MedicalType;
 import org.isf.shared.exceptions.OHResponseEntityExceptionHandler;
 import org.isf.utils.exception.OHDataIntegrityViolationException;
@@ -63,7 +64,9 @@ class MedicalControllerTest {
 	@Mock
 	private MedicalBrowsingManager managerMock;
 
-	private final MedicalMapper mapper = new MedicalMapper();
+	private final MedicalTypeMapper medicalTypeMapper = new MedicalTypeMapper();
+
+	private final MedicalMapper mapper = new MedicalMapper(medicalTypeMapper);
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -74,7 +77,9 @@ class MedicalControllerTest {
 	@BeforeEach
 	void setup() {
 		closeable = MockitoAnnotations.openMocks(this);
-		ReflectionTestUtils.setField(mapper, "modelMapper", new ModelMapper());
+		ModelMapper modelMapper = new ModelMapper();
+		ReflectionTestUtils.setField(medicalTypeMapper, "modelMapper", modelMapper);
+		ReflectionTestUtils.setField(mapper, "modelMapper", modelMapper);
 		this.mockMvc = MockMvcBuilders
 			.standaloneSetup(new MedicalController(managerMock, mapper))
 			.setControllerAdvice(new OHResponseEntityExceptionHandler())
