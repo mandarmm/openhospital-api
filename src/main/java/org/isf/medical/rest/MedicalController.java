@@ -166,13 +166,10 @@ public class MedicalController {
 		@RequestParam(name="ignore_similar", defaultValue="false") boolean ignoreSimilar
 	) throws OHServiceException {
 		LOGGER.info("Creating a new medical ...");
-		try {
-			LOGGER.info("Medical successfully created.");
-			return mapper.map2DTO(medicalManager.newMedical(mapper.map2Model(medicalDTO), ignoreSimilar));
-		} catch (OHServiceException serviceException) {
-			LOGGER.info("Medical is not created.");
-			throw new OHAPIException(new OHExceptionMessage("Medical not created."));
-		}
+		// the core's messages (product code in use, same medical, similar medicals) reach the client
+		Medical created = medicalManager.newMedical(mapper.map2Model(medicalDTO), ignoreSimilar);
+		LOGGER.info("Medical successfully created.");
+		return mapper.map2DTO(created);
 	}
 
 	/**
@@ -188,13 +185,10 @@ public class MedicalController {
 		@RequestParam(name="ignore_similar", defaultValue="false") boolean ignoreSimilar
 	) throws OHServiceException {
 		LOGGER.info("Updating a medical ...");
-		try {
-			LOGGER.info("Medical successfully updated.");
-			return mapper.map2DTO(medicalManager.updateMedical(mapper.map2Model(medicalDTO), ignoreSimilar));
-		} catch (OHServiceException serviceException) {
-			LOGGER.info("Medical is not updated.");
-			throw new OHAPIException(new OHExceptionMessage("Medical not updated."));
-		}
+		// the core's messages reach the client
+		Medical updated = medicalManager.updateMedical(mapper.map2Model(medicalDTO), ignoreSimilar);
+		LOGGER.info("Medical successfully updated.");
+		return mapper.map2DTO(updated);
 	}
 
 	/**
@@ -209,11 +203,8 @@ public class MedicalController {
 		if (medical == null) {
 			throw new OHAPIException(new OHExceptionMessage("Medical not found."), HttpStatus.NOT_FOUND);
 		}
-		try {
-			medicalManager.deleteMedical(medical);
-			return true;
-		} catch (OHServiceException serviceException) {
-			throw new OHAPIException(new OHExceptionMessage("Medical not deleted"));
-		}
+		// e.g. refused while stock movements refer to the medical; the core's message reaches the client
+		medicalManager.deleteMedical(medical);
+		return true;
 	}
 }
