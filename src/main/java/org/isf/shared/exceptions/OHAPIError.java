@@ -21,8 +21,6 @@
  */
 package org.isf.shared.exceptions;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
@@ -39,7 +37,6 @@ public class OHAPIError {
     private HttpStatus status;
     private String message;
     private String debugMessage;
-    private String stackTrace;
     private LocalDateTime timestamp;
     private ErrorDescription description;
 
@@ -51,9 +48,6 @@ public class OHAPIError {
                 .stream()
                 .map(em -> em.getMessage())
                 .collect(Collectors.joining(","));
-        StringWriter sw = new StringWriter();
-        ex.printStackTrace(new PrintWriter(sw));
-        this.stackTrace = sw.toString();
         this.description = ex.getMessages().get(0).getDescription();
     }
 
@@ -69,9 +63,6 @@ public class OHAPIError {
 		return this.debugMessage;
 	}
 
-	public String getStackTrace() {
-		return this.stackTrace;
-	}
 
 	public LocalDateTime getTimestamp() {
 		return this.timestamp;
@@ -89,9 +80,6 @@ public class OHAPIError {
 		this.debugMessage = debugMessage;
 	}
 
-	public void setStackTrace(String stackTrace) {
-		this.stackTrace = stackTrace;
-	}
 
 	public void setTimestamp(LocalDateTime timestamp) {
 		this.timestamp = timestamp;
