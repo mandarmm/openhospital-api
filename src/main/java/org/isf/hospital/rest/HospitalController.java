@@ -21,6 +21,10 @@
  */
 package org.isf.hospital.rest;
 
+import java.time.Duration;
+import java.time.LocalTime;
+
+import org.isf.generaldata.MessageBundle;
 import org.isf.hospital.dto.HospitalDTO;
 import org.isf.hospital.manager.HospitalBrowsingManager;
 import org.isf.hospital.mapper.HospitalMapper;
@@ -63,14 +67,47 @@ public class HospitalController {
             throw new OHAPIException(new OHExceptionMessage("Hospital code mismatch."));
         }
 
-        if (hospitalBrowsingManager.getHospital().getCode() == null) {
+        Hospital current = hospitalBrowsingManager.getHospital();
+        if (current == null || current.getCode() == null) {
             throw new OHAPIException(new OHExceptionMessage("Hospital not found."), HttpStatus.NOT_FOUND);
         }
 
         Hospital hospital = hospitalMapper.map2Model(hospitalDTO);
         hospital.setLock(hospitalDTO.getLock());
+        // clients that do not know the visiting hours keep the stored ones
+        if (hospitalDTO.getVisitStartTime() == null) {
+            hospital.setVisitStartTime(current.getVisitStartTime());
+        }
+        if (hospitalDTO.getVisitEndTime() == null) {
+            hospital.setVisitEndTime(current.getVisitEndTime());
+        }
+        if (hospitalDTO.getVisitIncrement() == null) {
+            hospital.setVisitIncrement(current.getVisitIncrement());
+        }
+        if (hospitalDTO.getVisitDuration() == null) {
+            hospital.setVisitDuration(current.getVisitDuration());
+        }
+        validateVisitingHours(hospital);
 
         return hospitalMapper.map2DTO(hospitalBrowsingManager.updateHospital(hospital));
+    }
+
+    /**
+     * The checks of the Swing hospital browser: visiting hours start before they end, and a visit is positive and
+     * fits in them.
+     */
+    private static void validateVisitingHours(Hospital hospital) throws OHAPIException {
+        LocalTime start = hospital.getVisitStartTime().toLocalTime();
+        LocalTime end = hospital.getVisitEndTime().toLocalTime();
+        if (!start.isBefore(end)) {
+            throw new OHAPIException(new OHExceptionMessage(
+                MessageBundle.getMessage("angal.hospital.thestartofvisitinghoursislaterthantheendhour.msg")));
+        }
+        long minutes = Duration.between(start, end).toMinutes();
+        if (hospital.getVisitDuration() <= 0 || hospital.getVisitDuration() > minutes || hospital.getVisitIncrement() <= 0) {
+            throw new OHAPIException(new OHExceptionMessage(
+                MessageBundle.getMessage("angal.hospital.thevisitdurationmustbepositiveandlessthanthelengthofthevisitinghours.msg")));
+        }
     }
 
     @GetMapping("/hospitals")
