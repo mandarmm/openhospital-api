@@ -58,13 +58,13 @@ public class DiseaseDTO {
 	private int hashCode;
 
 	@Schema(description = "Lock", example = "0")
-	private int lock;
+	private Integer lock;
 
-	public int getLock() {
+	public Integer getLock() {
 		return lock;
 	}
 
-	public void setLock(int lock) {
+	public void setLock(Integer lock) {
 		this.lock = lock;
 	}
 
