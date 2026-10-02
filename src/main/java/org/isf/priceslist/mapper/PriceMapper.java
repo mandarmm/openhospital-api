@@ -21,6 +21,8 @@
  */
 package org.isf.priceslist.mapper;
 
+import java.util.List;
+
 import org.isf.priceslist.dto.PriceDTO;
 import org.isf.priceslist.model.Price;
 import org.isf.shared.GenericMapper;
@@ -28,7 +30,49 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class PriceMapper extends GenericMapper<Price, PriceDTO> {
-	public PriceMapper() {
+
+	private final PriceListMapper priceListMapper;
+
+	public PriceMapper(PriceListMapper priceListMapper) {
 		super(Price.class, PriceDTO.class);
+		this.priceListMapper = priceListMapper;
+	}
+
+	/*
+	 * Mapped by hand: the model has both getPrice() (the amount) and isPrice() (whether the price has an item), so
+	 * implicit mapping could take the boolean for "price" depending on reflection order and return 1 for every price.
+	 */
+
+	@Override
+	public PriceDTO map2DTO(Price price) {
+		PriceDTO dto = new PriceDTO();
+		dto.setId(price.getId());
+		dto.setList(price.getList() != null ? priceListMapper.map2DTO(price.getList()) : null);
+		dto.setGroup(price.getGroup());
+		dto.setItem(price.getItem());
+		dto.setDescription(price.getDesc());
+		dto.setPrice(price.getPrice());
+		dto.setLock(price.getLock());
+		dto.setEditable(price.isEditable());
+		return dto;
+	}
+
+	@Override
+	public Price map2Model(PriceDTO dto) {
+		Price price = new Price(dto.getId(), dto.getList() != null ? priceListMapper.map2Model(dto.getList()) : null, dto.getGroup(),
+			dto.getItem(), dto.getDescription(), dto.getPrice());
+		price.setEditable(dto.isEditable());
+		price.setLock(dto.getLock());
+		return price;
+	}
+
+	@Override
+	public List<PriceDTO> map2DTOList(List<Price> list) {
+		return list.stream().map(this::map2DTO).toList();
+	}
+
+	@Override
+	public List<Price> map2ModelList(List<PriceDTO> list) {
+		return list.stream().map(this::map2Model).toList();
 	}
 }

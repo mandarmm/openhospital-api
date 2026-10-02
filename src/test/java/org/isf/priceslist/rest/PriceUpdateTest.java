@@ -64,7 +64,7 @@ class PriceUpdateTest {
 	private PriceListManager managerMock;
 
 	private final PriceListMapper listMapper = new PriceListMapper();
-	private final PriceMapper priceMapper = new PriceMapper();
+	private final PriceMapper priceMapper = new PriceMapper(listMapper);
 
 	private final PriceList basic = new PriceList(1, "LIST001", "Basic", "Basic list", "EUR");
 	private final PriceList other = new PriceList(2, "LIST002", "Other", "Other list", "EUR");
@@ -102,7 +102,9 @@ class PriceUpdateTest {
 		mockMvc.perform(get("/pricelists/1/prices"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.length()").value(1))
-			.andExpect(jsonPath("$[0].price").value(10.0));
+			.andExpect(jsonPath("$[0].price").value(10.0))
+			.andExpect(jsonPath("$[0].description").value("HB"))
+			.andExpect(jsonPath("$[0].list.id").value(1));
 	}
 
 	@Test
