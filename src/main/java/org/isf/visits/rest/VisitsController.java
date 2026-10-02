@@ -23,6 +23,8 @@ package org.isf.visits.rest;
 
 import java.util.List;
 
+import org.isf.patient.manager.PatientBrowserManager;
+import org.isf.patient.model.Patient;
 import org.isf.shared.exceptions.OHAPIException;
 import org.isf.utils.exception.OHServiceException;
 import org.isf.utils.exception.model.OHExceptionMessage;
@@ -59,9 +61,12 @@ public class VisitsController {
 
 	private final VisitMapper mapper;
 
-	public VisitsController(VisitManager visitManager, VisitMapper visitMapper) {
+	private final PatientBrowserManager patientManager;
+
+	public VisitsController(VisitManager visitManager, VisitMapper visitMapper, PatientBrowserManager patientManager) {
 		this.visitManager = visitManager;
 		this.mapper = visitMapper;
+		this.patientManager = patientManager;
 	}
 
 	/**
@@ -89,7 +94,7 @@ public class VisitsController {
 	@ResponseStatus(HttpStatus.CREATED)
 	public VisitDTO newVisit(@RequestBody VisitDTO newVisit) throws OHServiceException {
 		LOGGER.info("Create Visit: {}", newVisit);
-		return mapper.map2DTO(visitManager.newVisit(mapper.map2Model(newVisit)));
+		return mapper.map2DTO(visitManager.newVisit(withStoredPatient(mapper.map2Model(newVisit))));
 	}
 
 	/**
@@ -141,12 +146,43 @@ public class VisitsController {
 			throw new OHAPIException(new OHExceptionMessage("Visit not found."), HttpStatus.NOT_FOUND);
 		}
 
-		Visit visitUp = mapper.map2Model(updateVisit);
+		Visit visitUp = withStoredPatient(mapper.map2Model(updateVisit));
 		Visit visitUpdate = visitManager.newVisit(visitUp);
 		if (visitUpdate == null) {
 			throw new OHAPIException(new OHExceptionMessage("Visit not updated."));
 		}
 
 		return mapper.map2DTO(visitUpdate);
+	}
+
+	/**
+	 * Delete a visit.
+	 *
+	 * @param visitID the id of the visit
+	 * @return {@code true} if the visit has been deleted
+	 * @throws OHServiceException When failed to delete the visit
+	 */
+	@DeleteMapping("/visits/{visitID}")
+	public boolean deleteVisit(@PathVariable("visitID") int visitID) throws OHServiceException {
+		LOGGER.info("Delete Visit: {}", visitID);
+		Visit visit = visitManager.findVisit(visitID);
+		if (visit == null) {
+			throw new OHAPIException(new OHExceptionMessage("Visit not found."), HttpStatus.NOT_FOUND);
+		}
+		visitManager.deleteVisit(visit);
+		return true;
+	}
+
+	/*
+	 * The payload's patient may carry only its code: the stored patient is needed for the checks of the visit
+	 * (e.g. whether the patient's sex suits the ward).
+	 */
+	private Visit withStoredPatient(Visit visit) throws OHServiceException {
+		Patient patient = visit.getPatient() == null ? null : patientManager.getPatientById(visit.getPatient().getCode());
+		if (patient == null) {
+			throw new OHAPIException(new OHExceptionMessage("Patient not found."), HttpStatus.NOT_FOUND);
+		}
+		visit.setPatient(patient);
+		return visit;
 	}
 }
