@@ -22,15 +22,21 @@
 package org.isf.patvac.rest;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
+import org.isf.patient.manager.PatientBrowserManager;
+import org.isf.patient.model.Patient;
 import org.isf.patvac.dto.PatientVaccineDTO;
 import org.isf.patvac.manager.PatVacManager;
 import org.isf.patvac.mapper.PatVacMapper;
 import org.isf.patvac.model.PatientVaccine;
+import org.isf.patvac.service.PatVacIoOperations;
 import org.isf.shared.exceptions.OHAPIException;
 import org.isf.utils.exception.OHServiceException;
 import org.isf.utils.exception.model.OHExceptionMessage;
+import org.isf.vaccine.manager.VaccineBrowserManager;
+import org.isf.vaccine.model.Vaccine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -61,9 +67,19 @@ public class PatVacController {
 
 	private final PatVacMapper mapper;
 
-	public PatVacController(PatVacManager patVacManager, PatVacMapper patientVaccineMapper) {
+	private final PatVacIoOperations patVacIoOperations;
+
+	private final PatientBrowserManager patientManager;
+
+	private final VaccineBrowserManager vaccineManager;
+
+	public PatVacController(PatVacManager patVacManager, PatVacMapper patientVaccineMapper, PatVacIoOperations patVacIoOperations,
+		PatientBrowserManager patientManager, VaccineBrowserManager vaccineManager) {
 		this.patVacManager = patVacManager;
 		this.mapper = patientVaccineMapper;
+		this.patVacIoOperations = patVacIoOperations;
+		this.patientManager = patientManager;
+		this.vaccineManager = vaccineManager;
 	}
 
 	/**
@@ -77,12 +93,10 @@ public class PatVacController {
 	public PatientVaccineDTO newPatientVaccine(@RequestBody PatientVaccineDTO patientVaccineDTO) throws OHServiceException {
 		LOGGER.info("Create patient vaccine {}", patientVaccineDTO.getCode());
 
-		try {
-			return mapper.map2DTO(patVacManager.newPatientVaccine(mapper.map2Model(patientVaccineDTO)));
-		} catch (OHServiceException serviceException) {
-			LOGGER.error("Patient vaccine not created.");
-			throw new OHAPIException(new OHExceptionMessage("Patient vaccine not created."));
-		}
+		// the core's messages (date, progressive, vaccine, patient) reach the client
+		PatientVaccine patVac = withStored(mapper.map2Model(patientVaccineDTO));
+		patVac.setCode(0);
+		return mapper.map2DTO(patVacManager.newPatientVaccine(patVac));
 	}
 
 	/**
@@ -96,14 +110,12 @@ public class PatVacController {
 		@PathVariable Integer code, @RequestBody PatientVaccineDTO patientVaccineDTO
 	) throws OHServiceException {
 		LOGGER.info("Update patientvaccines code: {}", patientVaccineDTO.getCode());
-		PatientVaccine patvac = mapper.map2Model(patientVaccineDTO);
-		patvac.setLock(patientVaccineDTO.getLock());
-		try {
-			return mapper.map2DTO(patVacManager.updatePatientVaccine(mapper.map2Model(patientVaccineDTO)));
-		} catch (OHServiceException serviceException) {
-			LOGGER.error("Patient vaccine not updated.");
-			throw new OHAPIException(new OHExceptionMessage("Patient vaccine not updated."));
+		if (patVacManager.getPatientVaccine(code).isEmpty()) {
+			throw new OHAPIException(new OHExceptionMessage("Patient vaccine not found."), HttpStatus.NOT_FOUND);
 		}
+		PatientVaccine patVac = withStored(mapper.map2Model(patientVaccineDTO));
+		patVac.setCode(code);
+		return mapper.map2DTO(patVacManager.updatePatientVaccine(patVac));
 	}
 
 	/**
@@ -140,8 +152,9 @@ public class PatVacController {
 	) throws OHServiceException {
 		LOGGER.info("filter patient vaccine by dates ranges");
 
+		// the whole "to" day: its vaccinations were left out
 		return mapper.map2DTOList(patVacManager.getPatientVaccine(
-			vaccineTypeCode, vaccineCode, dateFrom.atStartOfDay(), dateTo.atStartOfDay(), sex, ageFrom, ageTo
+			vaccineTypeCode, vaccineCode, dateFrom.atStartOfDay(), dateTo.atTime(LocalTime.MAX), sex, ageFrom, ageTo
 		));
 	}
 
@@ -166,13 +179,43 @@ public class PatVacController {
 	@DeleteMapping("/patientvaccines/{code}")
 	public boolean deletePatientVaccine(@PathVariable int code) throws OHServiceException {
 		LOGGER.info("Delete patient vaccine code: {}", code);
-		PatientVaccine patVac = new PatientVaccine();
-		patVac.setCode(code);
-		try {
-			patVacManager.deletePatientVaccine(patVac);
-			return true;
-		} catch (OHServiceException serviceException) {
-			throw new OHAPIException(new OHExceptionMessage("Patient vaccine not deleted."));
+		// the stored vaccination, with its lock: a bare one with only the code failed once it had been updated
+		PatientVaccine patVac = patVacManager.getPatientVaccine(code)
+			.orElseThrow(() -> new OHAPIException(new OHExceptionMessage("Patient vaccine not found."), HttpStatus.NOT_FOUND));
+		patVacManager.deletePatientVaccine(patVac);
+		return true;
+	}
+
+	/**
+	 * The vaccinations of a patient.
+	 *
+	 * @param patientCode the patient's code
+	 * @return the patient's vaccinations
+	 * @throws OHServiceException When failed to get them
+	 */
+	@GetMapping("/patientvaccines/patient/{patientCode}")
+	public List<PatientVaccineDTO> getPatientVaccinesOfPatient(@PathVariable int patientCode) throws OHServiceException {
+		return mapper.map2DTOList(patVacIoOperations.findForPatient(patientCode));
+	}
+
+	/**
+	 * The stored patient and vaccine: the payload may carry only their codes.
+	 */
+	private PatientVaccine withStored(PatientVaccine patVac) throws OHServiceException {
+		if (patVac.getPatient() != null) {
+			Patient patient = patientManager.getPatientById(patVac.getPatient().getCode());
+			if (patient == null) {
+				throw new OHAPIException(new OHExceptionMessage("Patient not found."), HttpStatus.NOT_FOUND);
+			}
+			patVac.setPatient(patient);
 		}
+		if (patVac.getVaccine() != null) {
+			Vaccine vaccine = vaccineManager.findVaccine(patVac.getVaccine().getCode());
+			if (vaccine == null) {
+				throw new OHAPIException(new OHExceptionMessage("Vaccine not found."), HttpStatus.NOT_FOUND);
+			}
+			patVac.setVaccine(vaccine);
+		}
+		return patVac;
 	}
 }
