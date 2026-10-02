@@ -29,6 +29,7 @@ import jakarta.validation.Valid;
 import org.isf.medical.dto.MedicalDTO;
 import org.isf.medical.mapper.MedicalMapper;
 import org.isf.shared.exceptions.OHAPIException;
+import org.isf.sms.service.SmsOperations;
 import org.isf.therapy.dto.TherapyDTO;
 import org.isf.therapy.dto.TherapyRowDTO;
 import org.isf.therapy.manager.TherapyManager;
@@ -70,18 +71,22 @@ public class TherapyController {
 
 	private final TherapyIoOperationRepository therapyRepository;
 
+	private final SmsOperations smsOperations;
+
 	public TherapyController(
 		TherapyManager manager,
 		TherapyMapper therapyMapper,
 		TherapyRowMapper therapyRowMapper,
 		MedicalMapper medicalMapper,
-		TherapyIoOperationRepository therapyRepository
+		TherapyIoOperationRepository therapyRepository,
+		SmsOperations smsOperations
 	) {
 		this.manager = manager;
 		this.therapyMapper = therapyMapper;
 		this.therapyRowMapper = therapyRowMapper;
 		this.medicalMapper = medicalMapper;
 		this.therapyRepository = therapyRepository;
+		this.smsOperations = smsOperations;
 	}
 
 	/**
@@ -92,12 +97,15 @@ public class TherapyController {
 	 */
 	@PostMapping("/therapies")
 	@ResponseStatus(HttpStatus.CREATED)
+	@Transactional(rollbackFor = OHServiceException.class)
 	public TherapyRowDTO newTherapy(@RequestBody TherapyRowDTO thRowDTO) throws OHServiceException {
 		if (thRowDTO.getPatID() == null) {
 			throw new OHAPIException(new OHExceptionMessage("Patient not found."), HttpStatus.NOT_FOUND);
 		}
 
-		return therapyRowMapper.map2DTO(manager.newTherapy(therapyRowMapper.map2Model(thRowDTO)));
+		TherapyRow created = manager.newTherapy(therapyRowMapper.map2Model(thRowDTO));
+		rescheduleSms(created.getPatient().getCode());
+		return therapyRowMapper.map2DTO(created);
 	}
 
 	/**
@@ -135,6 +143,7 @@ public class TherapyController {
 	 * @throws OHServiceException When failed to update the therapy
 	 */
 	@PutMapping("/therapies/rows/{therapyID}")
+	@Transactional(rollbackFor = OHServiceException.class)
 	public TherapyRowDTO updateTherapy(
 		@PathVariable("therapyID") int therapyID, @RequestBody @Valid TherapyRowDTO thRowDTO
 	) throws OHServiceException {
@@ -147,7 +156,9 @@ public class TherapyController {
 		therapy.setTherapyID(therapyID);
 		// a therapy stays with its patient
 		therapy.setPatient(stored.getPatient());
-		return therapyRowMapper.map2DTO(manager.newTherapy(therapy));
+		TherapyRow updated = manager.newTherapy(therapy);
+		rescheduleSms(stored.getPatient().getCode());
+		return therapyRowMapper.map2DTO(updated);
 	}
 
 	/**
@@ -157,11 +168,27 @@ public class TherapyController {
 	 * @throws OHServiceException When failed to delete the therapy
 	 */
 	@DeleteMapping("/therapies/rows/{therapyID}")
+	@Transactional(rollbackFor = OHServiceException.class)
 	public boolean deleteTherapy(@PathVariable("therapyID") int therapyID) throws OHServiceException {
 		TherapyRow stored = therapyRepository.findById(therapyID)
 			.orElseThrow(() -> new OHAPIException(new OHExceptionMessage("Therapy not found."), HttpStatus.NOT_FOUND));
+		Integer patientCode = stored.getPatient().getCode();
 		therapyRepository.delete(stored);
+		rescheduleSms(patientCode);
 		return true;
+	}
+
+	/**
+	 * Schedules again the SMS reminders of the patient's therapies, as the Swing therapy form does when it saves them:
+	 * {@link TherapyManager#newTherapies} saves the therapies unchanged and schedules the reminders of those with SMS.
+	 */
+	private void rescheduleSms(Integer patientCode) throws OHServiceException {
+		List<TherapyRow> therapies = manager.getTherapyRows(patientCode);
+		if (therapies.isEmpty()) {
+			smsOperations.deleteByModuleModuleID("therapy", String.valueOf(patientCode));
+		} else {
+			manager.newTherapies(therapies);
+		}
 	}
 
 	/**

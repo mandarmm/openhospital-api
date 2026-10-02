@@ -47,6 +47,7 @@ import org.isf.shared.exceptions.OHResponseEntityExceptionHandler;
 import org.isf.shared.mapper.converter.BlobToByteArrayConverter;
 import org.isf.shared.mapper.converter.ByteArrayToBlobConverter;
 import org.isf.shared.mapper.mappings.PatientMapping;
+import org.isf.sms.service.SmsOperations;
 import org.isf.therapy.dto.TherapyRowDTO;
 import org.isf.therapy.manager.TherapyManager;
 import org.isf.therapy.mapper.TherapyMapper;
@@ -77,6 +78,9 @@ class TherapyControllerTest {
 	@Mock
 	private TherapyIoOperationRepository repositoryMock;
 
+	@Mock
+	private SmsOperations smsOperationsMock;
+
 	private final TherapyRowMapper therapyRowMapper = new TherapyRowMapper();
 
 	private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
@@ -99,7 +103,7 @@ class TherapyControllerTest {
 		ReflectionTestUtils.setField(therapyRowMapper, "modelMapper", modelMapper);
 		ReflectionTestUtils.setField(therapyRowMapper, "patientMapper", patientMapper);
 		this.mockMvc = MockMvcBuilders
-			.standaloneSetup(new TherapyController(managerMock, new TherapyMapper(), therapyRowMapper, new MedicalMapper(), repositoryMock))
+			.standaloneSetup(new TherapyController(managerMock, new TherapyMapper(), therapyRowMapper, new MedicalMapper(), repositoryMock, smsOperationsMock))
 			.setControllerAdvice(new OHResponseEntityExceptionHandler())
 			.build();
 		patient = PatientHelper.setup();
@@ -165,6 +169,19 @@ class TherapyControllerTest {
 	}
 
 	@Test
+	void testNewTherapy_reschedulesTheSmsOfThePatient() throws Exception {
+		TherapyRow created = therapy(9);
+		when(managerMock.newTherapy(any(TherapyRow.class))).thenReturn(created);
+		List<TherapyRow> patientTherapies = List.of(therapy(8), created);
+		when(managerMock.getTherapyRows(7)).thenReturn(patientTherapies);
+
+		this.mockMvc.perform(post("/therapies").contentType(MediaType.APPLICATION_JSON).content(json(therapyRowMapper.map2DTO(therapy(0)))))
+			.andExpect(status().isCreated());
+
+		verify(managerMock).newTherapies(patientTherapies);
+	}
+
+	@Test
 	void testUpdateTherapy_404() throws Exception {
 		when(repositoryMock.findById(anyInt())).thenReturn(Optional.empty());
 		this.mockMvc.perform(put("/therapies/rows/{therapyID}", 5).contentType(MediaType.APPLICATION_JSON)
@@ -177,9 +194,12 @@ class TherapyControllerTest {
 	void testDeleteTherapy() throws Exception {
 		TherapyRow stored = therapy(5);
 		when(repositoryMock.findById(5)).thenReturn(Optional.of(stored));
+		when(managerMock.getTherapyRows(7)).thenReturn(List.of());
 		this.mockMvc.perform(delete("/therapies/rows/{therapyID}", 5))
 			.andExpect(status().isOk());
 		verify(repositoryMock).delete(stored);
+		// the last therapy: its reminders go too
+		verify(smsOperationsMock).deleteByModuleModuleID("therapy", "7");
 	}
 
 	@Test
