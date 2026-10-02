@@ -55,6 +55,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequestMapping(produces = MediaType.APPLICATION_JSON_VALUE)
 public class MedStockMovementTypeController {
 
+	private static final String DEFAULT_CATEGORY = "operational";
+
 	private static final Logger LOGGER = LoggerFactory.getLogger(MedStockMovementTypeController.class);
 
 	private final MovementTypeMapper mapper;
@@ -105,6 +107,9 @@ public class MedStockMovementTypeController {
 	public MovementTypeDTO newMedicalDsrStockMovementType(
 		@RequestBody @Valid MovementTypeDTO medicalDsrStockMovementType
 	) throws OHServiceException {
+		if (medicalDsrStockMovementType.getCategory() == null) {
+			medicalDsrStockMovementType.setCategory(DEFAULT_CATEGORY);
+		}
 		try {
 			MovementType isCreatedMovementType = manager.newMedicalDsrStockMovementType(mapper.map2Model(medicalDsrStockMovementType));
 			return mapper.map2DTO(isCreatedMovementType);
@@ -125,8 +130,13 @@ public class MedStockMovementTypeController {
 		@RequestBody @Valid MovementTypeDTO medicalDsrStockMovementTypeDTO
 	) throws OHServiceException {
 		MovementType medicalDsrStockMovementType = mapper.map2Model(medicalDsrStockMovementTypeDTO);
-		if (!manager.isCodePresent(medicalDsrStockMovementType.getCode())) {
+		MovementType current = manager.getMovementType(medicalDsrStockMovementType.getCode());
+		if (current == null) {
 			throw new OHAPIException(new OHExceptionMessage("Movement type not found."), HttpStatus.NOT_FOUND);
+		}
+		if (medicalDsrStockMovementType.getCategory() == null) {
+			// clients that do not know the category keep the stored one
+			medicalDsrStockMovementType.setCategory(current.getCategory());
 		}
 
 		try {
