@@ -35,6 +35,7 @@ import org.isf.therapy.manager.TherapyManager;
 import org.isf.therapy.mapper.TherapyMapper;
 import org.isf.therapy.mapper.TherapyRowMapper;
 import org.isf.therapy.model.TherapyRow;
+import org.isf.therapy.service.TherapyIoOperationRepository;
 import org.isf.utils.exception.OHServiceException;
 import org.isf.utils.exception.model.OHExceptionMessage;
 import org.springframework.http.HttpStatus;
@@ -42,7 +43,9 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -65,16 +68,20 @@ public class TherapyController {
 
 	private final MedicalMapper medicalMapper;
 
+	private final TherapyIoOperationRepository therapyRepository;
+
 	public TherapyController(
 		TherapyManager manager,
 		TherapyMapper therapyMapper,
 		TherapyRowMapper therapyRowMapper,
-		MedicalMapper medicalMapper
+		MedicalMapper medicalMapper,
+		TherapyIoOperationRepository therapyRepository
 	) {
 		this.manager = manager;
 		this.therapyMapper = therapyMapper;
 		this.therapyRowMapper = therapyRowMapper;
 		this.medicalMapper = medicalMapper;
+		this.therapyRepository = therapyRepository;
 	}
 
 	/**
@@ -94,19 +101,67 @@ public class TherapyController {
 	}
 
 	/**
-	 * Replaces all therapies for related Patient.
-	 * @param thRowDTOs - the list of therapies
-	 * @return {@code true} if the rows has been inserted, {@code false} otherwise
+	 * Replaces all therapies for related Patient, as the Swing therapy form saves them.
+	 * @param thRowDTOs - the list of therapies, all of the same patient
+	 * @return the first of the patient's therapies once replaced
 	 * @throws OHServiceException When failed to replace patient therapies
 	 */
 	@PostMapping("/therapies/replace")
 	@ResponseStatus(HttpStatus.CREATED)
+	@Transactional(rollbackFor = OHServiceException.class)
 	public TherapyRowDTO replaceTherapies(
 		@RequestBody @Valid List<TherapyRowDTO> thRowDTOs
 	) throws OHServiceException {
-		ArrayList<TherapyRow> therapies = (ArrayList<TherapyRow>)therapyRowMapper.map2ModelList(thRowDTOs);
+		if (thRowDTOs.isEmpty()) {
+			throw new OHAPIException(new OHExceptionMessage("No therapies to replace with."));
+		}
+		List<TherapyRow> therapies = new ArrayList<>(therapyRowMapper.map2ModelList(thRowDTOs));
+		Integer patientCode = therapies.get(0).getPatient().getCode();
+		if (therapies.stream().anyMatch(therapy -> !patientCode.equals(therapy.getPatient().getCode()))) {
+			throw new OHAPIException(new OHExceptionMessage("The therapies must be of one patient."));
+		}
+		manager.deleteAllTherapies(patientCode);
+		// inserted again, with new ids
+		therapies.forEach(therapy -> therapy.setTherapyID(0));
+		manager.newTherapies(therapies);
+		return therapyRowMapper.map2DTO(manager.getTherapyRows(patientCode).get(0));
+	}
 
-		return therapyRowMapper.map2DTO(manager.newTherapy(therapies.get(0)));
+	/**
+	 * Updates one therapy.
+	 * @param therapyID - the therapy's id
+	 * @param thRowDTO - the therapy
+	 * @return the updated therapy
+	 * @throws OHServiceException When failed to update the therapy
+	 */
+	@PutMapping("/therapies/rows/{therapyID}")
+	public TherapyRowDTO updateTherapy(
+		@PathVariable("therapyID") int therapyID, @RequestBody @Valid TherapyRowDTO thRowDTO
+	) throws OHServiceException {
+		TherapyRow stored = therapyRepository.findById(therapyID)
+			.orElseThrow(() -> new OHAPIException(new OHExceptionMessage("Therapy not found."), HttpStatus.NOT_FOUND));
+		if (thRowDTO.getTherapyID() != 0 && thRowDTO.getTherapyID() != therapyID) {
+			throw new OHAPIException(new OHExceptionMessage("Therapy id mismatch."));
+		}
+		TherapyRow therapy = therapyRowMapper.map2Model(thRowDTO);
+		therapy.setTherapyID(therapyID);
+		// a therapy stays with its patient
+		therapy.setPatient(stored.getPatient());
+		return therapyRowMapper.map2DTO(manager.newTherapy(therapy));
+	}
+
+	/**
+	 * Deletes one therapy.
+	 * @param therapyID - the therapy's id
+	 * @return {@code true} if the therapy has been deleted
+	 * @throws OHServiceException When failed to delete the therapy
+	 */
+	@DeleteMapping("/therapies/rows/{therapyID}")
+	public boolean deleteTherapy(@PathVariable("therapyID") int therapyID) throws OHServiceException {
+		TherapyRow stored = therapyRepository.findById(therapyID)
+			.orElseThrow(() -> new OHAPIException(new OHExceptionMessage("Therapy not found."), HttpStatus.NOT_FOUND));
+		therapyRepository.delete(stored);
+		return true;
 	}
 
 	/**
