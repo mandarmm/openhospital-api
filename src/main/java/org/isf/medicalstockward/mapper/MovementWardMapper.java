@@ -23,11 +23,15 @@ package org.isf.medicalstockward.mapper;
 
 import java.util.List;
 
+import org.isf.medical.dto.MedicalDTO;
+import org.isf.medicals.model.Medical;
 import org.isf.medicalstock.mapper.LotMapper;
 import org.isf.medicalstockward.dto.MovementWardDTO;
 import org.isf.medicalstockward.model.MovementWard;
 import org.isf.patient.mapper.PatientMapper;
 import org.isf.shared.GenericMapper;
+import org.isf.ward.dto.WardDTO;
+import org.isf.ward.model.Ward;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -45,26 +49,43 @@ public class MovementWardMapper extends GenericMapper<MovementWard, MovementWard
 	}
 
 	/*
-	 * The lot is mapped by hand: the model's setter is "setlot", which the implicit mapping does not find, and without
-	 * a lot the ward stock cannot be updated. The patient flag and the patient too: both have a "setPatient".
+	 * Mapped by hand: the patient flag and the patient both have a "setPatient" (in the model and in the DTO), which
+	 * the implicit mapping confuses, and the model's lot setter is "setlot", which it does not find; without a lot the
+	 * ward stock cannot be updated.
 	 */
 
 	@Override
 	public MovementWardDTO map2DTO(MovementWard movement) {
-		MovementWardDTO dto = super.map2DTO(movement);
+		MovementWardDTO dto = new MovementWardDTO(movement.getCode(), map(movement.getWard(), WardDTO.class), movement.getDate(),
+			movement.isPatient(), movement.getPatient() == null ? null : patientMapper.map2DTO(movement.getPatient()), movement.getAge(),
+			movement.getWeight(), movement.getDescription(), map(movement.getMedical(), MedicalDTO.class), movement.getQuantity(),
+			movement.getUnits(), map(movement.getWardTo(), WardDTO.class), map(movement.getWardFrom(), WardDTO.class));
 		dto.setLot(movement.getLot() == null ? null : lotMapper.map2DTO(movement.getLot()));
-		dto.setPatient(movement.isPatient());
-		dto.setPatient(movement.getPatient() == null ? null : patientMapper.map2DTO(movement.getPatient()));
 		return dto;
 	}
 
 	@Override
 	public MovementWard map2Model(MovementWardDTO dto) {
-		MovementWard movement = super.map2Model(dto);
-		movement.setlot(dto.getLot() == null ? null : lotMapper.map2Model(dto.getLot()));
+		MovementWard movement = new MovementWard();
+		movement.setCode(dto.getCode());
+		movement.setWard(map(dto.getWard(), Ward.class));
+		movement.setDate(dto.getDate());
 		movement.setPatient(dto.isPatient());
 		movement.setPatient(dto.getPatient() == null ? null : patientMapper.map2Model(dto.getPatient()));
+		movement.setAge(dto.getAge());
+		movement.setWeight(dto.getWeight());
+		movement.setDescription(dto.getDescription());
+		movement.setMedical(map(dto.getMedical(), Medical.class));
+		movement.setQuantity(dto.getQuantity());
+		movement.setUnits(dto.getUnits());
+		movement.setWardTo(map(dto.getWardTo(), Ward.class));
+		movement.setWardFrom(map(dto.getWardFrom(), Ward.class));
+		movement.setlot(dto.getLot() == null ? null : lotMapper.map2Model(dto.getLot()));
 		return movement;
+	}
+
+	private <T> T map(Object source, Class<T> type) {
+		return source == null ? null : modelMapper.map(source, type);
 	}
 
 	@Override
