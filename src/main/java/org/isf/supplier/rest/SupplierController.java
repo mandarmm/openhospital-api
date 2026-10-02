@@ -95,12 +95,18 @@ public class SupplierController {
 	 */
 	@PutMapping("/suppliers")
 	public SupplierDTO updateSupplier(@RequestBody @Valid SupplierDTO supplierDTO) throws OHServiceException {
-		if (supplierDTO.getSupId() == null || manager.getByID(supplierDTO.getSupId()) == null) {
+		Supplier current = supplierDTO.getSupId() == null ? null : manager.getByID(supplierDTO.getSupId());
+		if (current == null) {
 			throw new OHAPIException(new OHExceptionMessage("Supplier not found."), HttpStatus.NOT_FOUND);
+		}
+		Supplier supplier = mapper.map2Model(supplierDTO);
+		if (supplierDTO.getSupDeleted() == null) {
+			// clients that do not know the flag keep the stored one instead of restoring a deleted supplier
+			supplier.setSupDeleted(current.getSupDeleted());
 		}
 		LOGGER.info("Updating supplier...");
 		try {
-			Supplier updatedSupplier = manager.saveOrUpdate(mapper.map2Model(supplierDTO));
+			Supplier updatedSupplier = manager.saveOrUpdate(supplier);
 			LOGGER.info("Supplier updated successfully.");
 			return mapper.map2DTO(updatedSupplier);
 		} catch (OHServiceException serviceException) {
