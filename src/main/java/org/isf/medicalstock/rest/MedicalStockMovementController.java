@@ -261,7 +261,9 @@ public class MedicalStockMovementController {
 		}
 		movManager.deleteLastMovement(last, reason.trim());
 		return true;
+	}
 
+	/**
 	 * Updates a lot's dates and cost (Swing's lot management).
 	 *
 	 * @param code the lot's code
