@@ -192,6 +192,26 @@ public class UserController {
 	}
 
 	/**
+	 * Unlocks an account locked after too many failed logins.
+	 *
+	 * @param username the user to unlock
+	 * @return the unlocked user
+	 * @throws OHServiceException When failed to unlock the user
+	 */
+	@PostMapping("/users/{username}/unlock")
+	public UserDTO unlockUser(@PathVariable String username) throws OHServiceException {
+		User user = userManager.getUserByName(username, true);
+		if (user == null) {
+			throw new OHAPIException(new OHExceptionMessage("User not found."), HttpStatus.NOT_FOUND);
+		}
+		LOGGER.info("Unlocking user {}.", username);
+		userManager.unlockUser(user);
+		User unlocked = userManager.getUserByName(username, true);
+		unlocked.setPasswd(null);
+		return userMapper.map2DTO(unlocked);
+	}
+
+	/**
 	 * Deletes an existing {@link User}.
 	 * @param username - the name of the {@link User} to delete
 	 */

@@ -21,6 +21,8 @@
  */
 package org.isf.users.mapper;
 
+import java.util.List;
+
 import org.isf.menu.model.User;
 import org.isf.shared.GenericMapper;
 import org.isf.users.dto.UserDTO;
@@ -38,8 +40,30 @@ public class UserMapper extends GenericMapper<User, UserDTO> {
 	}
 
 	@Override
+	public UserDTO map2DTO(User user) {
+		UserDTO dto = super.map2DTO(user);
+		dto.setAccountLocked(user.isAccountLocked());
+		dto.setFailedAttempts(user.getFailedAttempts());
+		dto.setLockedTime(user.getLockedTime());
+		dto.setLastLogin(user.getLastLogin());
+		return dto;
+	}
+
+	@Override
+	public List<UserDTO> map2DTOList(List<User> list) {
+		return list.stream().map(this::map2DTO).toList();
+	}
+
+	/**
+	 * The lock status is never taken from a request: it is managed by the login and {@code POST /users/{username}/unlock}.
+	 */
+	@Override
 	public User map2Model(UserDTO dto) {
 		var user = super.map2Model(dto);
+		user.setAccountLocked(false);
+		user.setFailedAttempts(0);
+		user.setLockedTime(null);
+		user.setLastLogin(null);
 		if (dto.getPasswd() != null && !dto.getPasswd().isEmpty()) {
 			user.setPasswd(passwordEncoder.encode(user.getPasswd()));
 		}
