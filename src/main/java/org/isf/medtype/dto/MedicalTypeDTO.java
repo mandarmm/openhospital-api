@@ -35,6 +35,10 @@ public class MedicalTypeDTO {
 	@Schema(description = "Description of the medical type", example = "Medical material", maxLength = 30)
 	private String description;
 
+	@Schema(description = "Whether the medical type is deleted; 'false' when omitted on creation, unchanged when omitted on update",
+		example = "false")
+	private Boolean deleted;
+
 	public MedicalTypeDTO() {
 	}
 
@@ -53,6 +57,14 @@ public class MedicalTypeDTO {
 
 	public void setCode(String code) {
 		this.code = code;
+	}
+
+	public Boolean getDeleted() {
+		return this.deleted;
+	}
+
+	public void setDeleted(Boolean deleted) {
+		this.deleted = deleted;
 	}
 
 	public void setDescription(String description) {

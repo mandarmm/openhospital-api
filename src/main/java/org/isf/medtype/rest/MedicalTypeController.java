@@ -108,8 +108,13 @@ public class MedicalTypeController {
 	@PutMapping(value = "/medicaltypes")
 	public MedicalTypeDTO updateMedicalType(@RequestBody @Valid MedicalTypeDTO medicalTypeDTO) throws OHServiceException {
 		MedicalType medicalType = medicalTypeMapper.map2Model(medicalTypeDTO);
-		if (!medicalTypeBrowserManager.isCodePresent(medicalType.getCode())) {
-			throw new OHAPIException(new OHExceptionMessage("Medical type not found."), HttpStatus.NOT_FOUND);
+		MedicalType current = medicalTypeBrowserManager.getMedicalType().stream()
+			.filter(type -> type.getCode().equals(medicalType.getCode()))
+			.findFirst()
+			.orElseThrow(() -> new OHAPIException(new OHExceptionMessage("Medical type not found."), HttpStatus.NOT_FOUND));
+		if (medicalTypeDTO.getDeleted() == null) {
+			// clients that do not know the flag keep the stored one
+			medicalType.setDeleted(current.getDeleted());
 		}
 
 		MedicalType isUpdatedMedicalType = medicalTypeBrowserManager.updateMedicalType(medicalType);

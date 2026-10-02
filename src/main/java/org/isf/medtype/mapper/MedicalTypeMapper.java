@@ -21,6 +21,8 @@
  */
 package org.isf.medtype.mapper;
 
+import java.util.List;
+
 import org.isf.medtype.dto.MedicalTypeDTO;
 import org.isf.medtype.model.MedicalType;
 import org.isf.shared.GenericMapper;
@@ -30,5 +32,36 @@ import org.springframework.stereotype.Component;
 public class MedicalTypeMapper extends GenericMapper<MedicalType, MedicalTypeDTO> {
 	public MedicalTypeMapper() {
 		super(MedicalType.class, MedicalTypeDTO.class);
+	}
+
+	/*
+	 * Mapped by hand: the model keeps the deleted flag as a char ('Y' / 'N'), the DTO as a Boolean.
+	 */
+
+	@Override
+	public MedicalTypeDTO map2DTO(MedicalType medicalType) {
+		MedicalTypeDTO dto = new MedicalTypeDTO(medicalType.getCode(), medicalType.getDescription());
+		dto.setDeleted(medicalType.getDeleted() == 'Y');
+		return dto;
+	}
+
+	/**
+	 * A missing deleted flag maps to 'N'; callers updating an existing type keep its stored flag instead.
+	 */
+	@Override
+	public MedicalType map2Model(MedicalTypeDTO dto) {
+		MedicalType medicalType = new MedicalType(dto.getCode(), dto.getDescription());
+		medicalType.setDeleted(Boolean.TRUE.equals(dto.getDeleted()) ? 'Y' : 'N');
+		return medicalType;
+	}
+
+	@Override
+	public List<MedicalTypeDTO> map2DTOList(List<MedicalType> list) {
+		return list.stream().map(this::map2DTO).toList();
+	}
+
+	@Override
+	public List<MedicalType> map2ModelList(List<MedicalTypeDTO> list) {
+		return list.stream().map(this::map2Model).toList();
 	}
 }
