@@ -52,6 +52,10 @@ public class SupplierDTO {
 	@Schema(description = "The supplier's notes", example = "", maxLength = 200)
 	private String supNote;
 
+	@Schema(description = "Whether the supplier is deleted; false when omitted on creation, unchanged when omitted on update. "
+		+ "Set it to false to restore a deleted supplier", example = "false")
+	private Boolean supDeleted;
+
 	@Schema(description = "Lock", example = "0")
 	private int lock;
 
@@ -140,5 +144,13 @@ public class SupplierDTO {
 
 	public void setLock(int lock) {
 		this.lock = lock;
+	}
+
+	public Boolean getSupDeleted() {
+		return supDeleted;
+	}
+
+	public void setSupDeleted(Boolean supDeleted) {
+		this.supDeleted = supDeleted;
 	}
 }
