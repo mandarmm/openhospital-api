@@ -21,6 +21,10 @@
  */
 package org.isf.hospital.dto;
 
+import java.time.LocalTime;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public class HospitalDTO {
@@ -48,6 +52,20 @@ public class HospitalDTO {
 
 	@Schema(description = "Hospital Currency Cod", example = "EUR", maxLength = 3)
 	private String currencyCod;
+
+	@Schema(description = "Start of visiting hours; unchanged when omitted on update", example = "06:30:00", type = "string", format = "time")
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm:ss")
+	private LocalTime visitStartTime;
+
+	@Schema(description = "End of visiting hours; unchanged when omitted on update", example = "20:00:00", type = "string", format = "time")
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm:ss")
+	private LocalTime visitEndTime;
+
+	@Schema(description = "Step between visit slots, in minutes; unchanged when omitted on update", example = "15")
+	private Integer visitIncrement;
+
+	@Schema(description = "Duration of a visit, in minutes; unchanged when omitted on update", example = "30")
+	private Integer visitDuration;
 
 	@Schema(description = "Lock", example = "0")
 	private int lock;
@@ -118,6 +136,38 @@ public class HospitalDTO {
 
 	public void setEmail(String email) {
 		this.email = email;
+	}
+
+	public LocalTime getVisitStartTime() {
+		return visitStartTime;
+	}
+
+	public void setVisitStartTime(LocalTime visitStartTime) {
+		this.visitStartTime = visitStartTime;
+	}
+
+	public LocalTime getVisitEndTime() {
+		return visitEndTime;
+	}
+
+	public void setVisitEndTime(LocalTime visitEndTime) {
+		this.visitEndTime = visitEndTime;
+	}
+
+	public Integer getVisitIncrement() {
+		return visitIncrement;
+	}
+
+	public void setVisitIncrement(Integer visitIncrement) {
+		this.visitIncrement = visitIncrement;
+	}
+
+	public Integer getVisitDuration() {
+		return visitDuration;
+	}
+
+	public void setVisitDuration(Integer visitDuration) {
+		this.visitDuration = visitDuration;
 	}
 
 	public void setCurrencyCod(String currencyCod) {
