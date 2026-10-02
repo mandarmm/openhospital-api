@@ -214,19 +214,22 @@ public class MedicalInventoryController {
 		checkPermission(inventory.getInventoryType(), "update");
 		List<MedicalInventoryRow> rows = rowManager.getMedicalInventoryRowByInventoryId(id);
 		checkReadyForValidation(inventory, rows, ward);
-		inventory.setStatus(InventoryStatus.validated.toString());
 		try {
 			if (ward) {
 				inventoryManager.validateMedicalWardInventoryRow(inventory, rows, allMedicals);
 			} else {
 				inventoryManager.validateMedicalInventoryRow(inventory, rows, allMedicals);
 			}
+			inventory.setStatus(InventoryStatus.validated.toString());
 			inventoryManager.updateMedicalInventory(inventory, true);
 		} catch (OHDataValidationException changes) {
 			if (!actualize) {
+				// the inventory stays as it was: its quantities are out of date
 				return ResponseEntity.status(HttpStatus.CONFLICT)
 					.body(changes.getMessages().stream().map(OHExceptionMessage::getMessage).toList());
 			}
+			// as Swing: brought up to date (and saved) as validated
+			inventory.setStatus(InventoryStatus.validated.toString());
 			if (ward) {
 				inventoryManager.actualizeMedicalWardInventoryRow(inventory, allMedicals);
 			} else {

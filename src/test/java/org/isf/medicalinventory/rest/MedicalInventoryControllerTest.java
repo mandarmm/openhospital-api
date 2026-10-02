@@ -182,6 +182,9 @@ class MedicalInventoryControllerTest {
 			.andExpect(status().isConflict())
 			.andExpect(content().string(containsString("theoreticalqtyhavebeenupdated")));
 		verify(inventoryManagerMock, never()).actualizeMedicalInventoryRow(any(), anyBoolean());
+		// out of date: still a draft
+		assertThat(inventory.getStatus()).isEqualTo("draft");
+		verify(inventoryManagerMock, never()).updateMedicalInventory(any(), anyBoolean());
 
 		this.mockMvc.perform(post("/medicalinventories/{id}/validate", 5).param("actualize", "true"))
 			.andExpect(status().isOk());
