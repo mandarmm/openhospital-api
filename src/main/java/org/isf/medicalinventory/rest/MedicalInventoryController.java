@@ -260,7 +260,8 @@ public class MedicalInventoryController {
 	}
 
 	/**
-	 * Deletes a draft or validated inventory with its rows.
+	 * Cancels a draft or validated inventory: the core keeps it and its rows, marked canceled (lots of new rows are
+	 * deleted).
 	 */
 	@DeleteMapping("/{id}")
 	public boolean deleteInventory(@PathVariable("id") int id) throws OHServiceException {
