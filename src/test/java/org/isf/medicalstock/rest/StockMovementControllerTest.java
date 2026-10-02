@@ -33,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+import org.isf.medical.mapper.MedicalMapper;
 import org.isf.medicals.manager.MedicalBrowsingManager;
 import org.isf.medicalstock.data.MovementHelper;
 import org.isf.medicalstock.manager.MovBrowserManager;
@@ -40,6 +41,7 @@ import org.isf.medicalstock.manager.MovStockInsertingManager;
 import org.isf.medicalstock.mapper.LotMapper;
 import org.isf.medicalstock.mapper.MovementMapper;
 import org.isf.medicalstock.model.Movement;
+import org.isf.medtype.mapper.MedicalTypeMapper;
 import org.isf.shared.exceptions.OHResponseEntityExceptionHandler;
 import org.isf.shared.mapper.converter.BlobToByteArrayConverter;
 import org.isf.shared.mapper.converter.ByteArrayToBlobConverter;
@@ -99,6 +101,11 @@ class StockMovementControllerTest {
 		LotMapping.addMapping(modelMapper);
 		ReflectionTestUtils.setField(movementMapper, "modelMapper", modelMapper);
 		ReflectionTestUtils.setField(lotMapper, "modelMapper", modelMapper);
+		MedicalTypeMapper medicalTypeMapper = new MedicalTypeMapper();
+		ReflectionTestUtils.setField(medicalTypeMapper, "modelMapper", modelMapper);
+		MedicalMapper medicalMapper = new MedicalMapper(medicalTypeMapper);
+		ReflectionTestUtils.setField(medicalMapper, "modelMapper", modelMapper);
+		ReflectionTestUtils.setField(movementMapper, "medicalMapper", medicalMapper);
 	}
 
 	@AfterEach
