@@ -25,32 +25,45 @@ import java.util.List;
 
 import org.isf.medical.dto.MedicalDTO;
 import org.isf.medicals.model.Medical;
+import org.isf.medtype.mapper.MedicalTypeMapper;
 import org.isf.shared.GenericMapper;
 import org.springframework.stereotype.Component;
 
 @Component
 public class MedicalMapper extends GenericMapper<Medical, MedicalDTO> {
 
-	public MedicalMapper() {
+	private final MedicalTypeMapper medicalTypeMapper;
+
+	public MedicalMapper(MedicalTypeMapper medicalTypeMapper) {
 		super(Medical.class, MedicalDTO.class);
+		this.medicalTypeMapper = medicalTypeMapper;
 	}
 
 	/*
-	 * The product code is "prod_code" in the DTO and "prodCode" in the model, so the implicit mapping lost it: every
-	 * medical was returned without its code, and creating or updating one failed with an error 500 in the validation.
+	 * Mapped by hand: the product code is "prod_code" in the DTO and "prodCode" in the model, so the implicit mapping
+	 * lost it (every medical was returned without its code, and creating or updating one failed with an error 500 in the
+	 * validation). The type goes through its own mapper.
 	 */
 
 	@Override
 	public MedicalDTO map2DTO(Medical medical) {
-		MedicalDTO dto = super.map2DTO(medical);
-		dto.setProd_code(medical.getProdCode());
+		MedicalDTO dto = new MedicalDTO(medical.getCode(), medical.getType() == null ? null : medicalTypeMapper.map2DTO(medical.getType()),
+			medical.getProdCode(), medical.getDescription(), medical.getInitialqty(), medical.getPcsperpck(), medical.getMinqty(),
+			medical.getInqty(), medical.getOutqty());
+		dto.setLock(medical.getLock() == null ? 0 : medical.getLock());
 		return dto;
 	}
 
+	/**
+	 * A medical without product code gets an empty one, as in Swing. The initial quantity is not set: the model keeps
+	 * it at 0.
+	 */
 	@Override
 	public Medical map2Model(MedicalDTO dto) {
-		Medical medical = super.map2Model(dto);
-		medical.setProdCode(dto.getProd_code() == null ? "" : dto.getProd_code());
+		Medical medical = new Medical(dto.getCode(), dto.getType() == null ? null : medicalTypeMapper.map2Model(dto.getType()),
+			dto.getProd_code() == null ? "" : dto.getProd_code(), dto.getDescription(), dto.getPcsperpck(), dto.getMinqty(), dto.getInqty(),
+			dto.getOutqty());
+		medical.setLock(dto.getLock());
 		return medical;
 	}
 
