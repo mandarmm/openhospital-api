@@ -96,7 +96,9 @@ class MedicalInventoryControllerTest {
 		LotMapping.addMapping(modelMapper);
 		LotMapper lotMapper = new LotMapper();
 		ReflectionTestUtils.setField(lotMapper, "modelMapper", modelMapper);
-		MedicalMapper medicalMapper = new MedicalMapper();
+		org.isf.medtype.mapper.MedicalTypeMapper medicalTypeMapper = new org.isf.medtype.mapper.MedicalTypeMapper();
+		ReflectionTestUtils.setField(medicalTypeMapper, "modelMapper", modelMapper);
+		MedicalMapper medicalMapper = new MedicalMapper(medicalTypeMapper);
 		ReflectionTestUtils.setField(medicalMapper, "modelMapper", modelMapper);
 		this.mockMvc = MockMvcBuilders
 			.standaloneSetup(new MedicalInventoryController(inventoryManagerMock, rowManagerMock, medicalManagerMock, movStockInsertingManagerMock,
