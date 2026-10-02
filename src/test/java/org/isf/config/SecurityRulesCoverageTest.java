@@ -84,6 +84,10 @@ class SecurityRulesCoverageTest {
 		Set<String> paths = new TreeSet<>();
 		for (BeanDefinition candidate : scanner.findCandidateComponents("org.isf")) {
 			Class<?> controller = ClassUtils.resolveClassName(candidate.getBeanClassName(), SecurityRulesCoverageTest.class.getClassLoader());
+			if (controller.getProtectionDomain().getCodeSource().getLocation().getPath().contains("test-classes")) {
+				// a controller of the tests, not an endpoint of the API
+				continue;
+			}
 			RequestMapping classMapping = AnnotatedElementUtils.findMergedAnnotation(controller, RequestMapping.class);
 			String prefix = classMapping == null ? "" : Stream.of(classMapping.path()).findFirst().orElse("");
 			for (Method method : controller.getDeclaredMethods()) {
