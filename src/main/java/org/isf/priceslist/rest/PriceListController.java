@@ -23,7 +23,10 @@ package org.isf.priceslist.rest;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.isf.priceslist.dto.PriceDTO;
+import org.isf.priceslist.dto.PriceItemDTO;
 import org.isf.priceslist.dto.PriceListDTO;
 import org.isf.priceslist.manager.PriceListManager;
 import org.isf.priceslist.mapper.PriceListMapper;
@@ -129,6 +132,47 @@ public class PriceListController {
 		LOGGER.info("Get all prices.");
 
 		return priceMapper.map2DTOList(priceListManager.getPrices());
+	}
+
+	/**
+	 * Get the {@link Price}s of one {@link PriceList}.
+	 * @param id the price list id
+	 * @return the prices of the list
+	 * @throws OHServiceException When failed to get prices
+	 */
+	@GetMapping("/pricelists/{id}/prices")
+	public List<PriceDTO> getPrices(@PathVariable int id) throws OHServiceException {
+		PriceList list = findList(id);
+		return priceMapper.map2DTOList(priceListManager.getPrices().stream()
+			.filter(price -> price.getList() != null && price.getList().getId() == list.getId())
+			.toList());
+	}
+
+	/**
+	 * Replace all the {@link Price}s of a {@link PriceList}, as the Swing price browser saves them.
+	 * Items left out have no price in the list afterwards.
+	 * @param id the price list id
+	 * @param prices the complete set of prices of the list
+	 * @return the stored prices of the list
+	 * @throws OHServiceException When failed to update prices
+	 */
+	@PutMapping("/pricelists/{id}/prices")
+	public List<PriceDTO> updatePrices(@PathVariable int id, @RequestBody @Valid List<@Valid PriceItemDTO> prices)
+		throws OHServiceException {
+		PriceList list = findList(id);
+		LOGGER.info("Update {} prices of list {}.", prices.size(), id);
+		priceListManager.updatePrices(list, prices.stream()
+			.map(price -> new Price(list, price.group(), price.item(),
+				price.description() != null ? price.description() : "", price.price()))
+			.toList());
+		return getPrices(id);
+	}
+
+	private PriceList findList(int id) throws OHServiceException {
+		return priceListManager.getLists().stream()
+			.filter(list -> list.getId() == id)
+			.findFirst()
+			.orElseThrow(() -> new OHAPIException(new OHExceptionMessage("Price list not found."), HttpStatus.NOT_FOUND));
 	}
 
 	/**
