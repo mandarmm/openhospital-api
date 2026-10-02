@@ -278,6 +278,11 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.DELETE, "/users/**").hasAuthority("users.delete")
 				// user setting
 				.requestMatchers("/usersettings/**").authenticated()
+				// dicomtypes: everybody may read them (needed to attach images); changing them is an administration task
+				.requestMatchers(HttpMethod.GET, "/dicomtypes/**").authenticated()
+				.requestMatchers(HttpMethod.POST, "/dicomtypes/**").hasAuthority("admin.access")
+				.requestMatchers(HttpMethod.PUT, "/dicomtypes/**").hasAuthority("admin.access")
+				.requestMatchers(HttpMethod.DELETE, "/dicomtypes/**").hasAuthority("admin.access")
 				// pregnanttreatmenttypes
 				.requestMatchers(HttpMethod.POST, "/pregnanttreatmenttypes/**").hasAuthority("pregnanttreatmenttypes.create")
 				.requestMatchers(HttpMethod.GET, "/pregnanttreatmenttypes/**").hasAnyAuthority("pregnanttreatmenttypes.read")
