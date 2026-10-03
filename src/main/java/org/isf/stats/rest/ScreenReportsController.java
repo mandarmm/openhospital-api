@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.isf.accounting.manager.BillBrowserManager;
 import org.isf.admission.manager.AdmissionBrowserManager;
 import org.isf.admission.model.Admission;
 import org.isf.generaldata.GeneralData;
@@ -58,6 +59,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -109,12 +112,15 @@ public class ScreenReportsController {
 
 	private final HospitalBrowsingManager hospitalManager;
 
+	private final BillBrowserManager billManager;
+
 	/** The sections of the patient report (Swing's patient report options); {@code All} for all of them. */
 	static final Set<String> PATIENT_SECTIONS = Set.of("All", "Drugs", "Examination", "Admission", "Opd", "Laboratory", "Operations");
 
 	public ScreenReportsController(JasperReportsManager reportsManager, OpdBrowserManager opdManager, AdmissionBrowserManager admissionManager,
 		WardBrowserManager wardManager, MedicalTypeBrowserManager medicalTypeManager, MedicalInventoryManager inventoryManager,
-		PatientBrowserManager patientManager, LabManager labManager, PriceListManager priceListManager, HospitalBrowsingManager hospitalManager) {
+		PatientBrowserManager patientManager, LabManager labManager, PriceListManager priceListManager, HospitalBrowsingManager hospitalManager,
+		BillBrowserManager billManager) {
 		this.reportsManager = reportsManager;
 		this.opdManager = opdManager;
 		this.admissionManager = admissionManager;
@@ -125,6 +131,7 @@ public class ScreenReportsController {
 		this.labManager = labManager;
 		this.priceListManager = priceListManager;
 		this.hospitalManager = hospitalManager;
+		this.billManager = billManager;
 	}
 
 	/** The report of an OPD visit (Swing patient folder: OPD chart). */
@@ -306,6 +313,48 @@ public class ScreenReportsController {
 			})
 			.toList();
 		return ReportsController.pdf(fill("PriceList", new JRMapCollectionDataSource(new ArrayList<>(rows))), "PriceList_" + list.getCode() + ".pdf");
+	}
+
+	/** The receipt of a bill (Swing bills: receipt). */
+	@GetMapping(value = "/reports/bill/{id}", produces = MediaType.APPLICATION_PDF_VALUE)
+	public ResponseEntity<byte[]> printBill(@PathVariable int id) throws OHServiceException {
+		checkBillsRead();
+		if (billManager.getBill(id) == null) {
+			throw notFound("Bill");
+		}
+		return ReportsController.pdf(reportsManager.getGenericReportBillPdf(id, GeneralData.PATIENTBILL, false, false), "Bill_" + id + ".pdf");
+	}
+
+	/** A patient's bills and payments (Swing bills: patient's statement). */
+	@GetMapping(value = "/reports/bill-statement/{patientCode}", produces = MediaType.APPLICATION_PDF_VALUE)
+	public ResponseEntity<byte[]> printBillStatement(@PathVariable int patientCode) throws OHServiceException {
+		checkBillsRead();
+		if (patientManager.getPatientById(patientCode) == null) {
+			throw notFound("Patient");
+		}
+		return ReportsController.pdf(reportsManager.getGenericReportPatientPdf(patientCode, GeneralData.PATIENTBILLSTATEMENT),
+			"BillStatement_" + patientCode + ".pdf");
+	}
+
+	/** The closure of a cashier's day: the bills and payments of a user on a day (Swing bills: today's closure). */
+	@GetMapping(value = "/reports/bills-closure", produces = MediaType.APPLICATION_PDF_VALUE)
+	public ResponseEntity<byte[]> printBillsClosure(
+		@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+		@RequestParam String user
+	) throws OHServiceException {
+		checkBillsRead();
+		return ReportsController.pdf(reportsManager.getGenericReportUserInDatePdf(date + " 00:00:00", date + " 23:59:59", user, "BillsReportUserInDate"),
+			"BillsClosure_" + user + "_" + date + ".pdf");
+	}
+
+	/** The bills' reports show billing: they need the bills permission too. */
+	private static void checkBillsRead() throws OHAPIException {
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		boolean granted = authentication != null && authentication.getAuthorities().stream()
+			.anyMatch(authority -> "bills.read".equals(authority.getAuthority()));
+		if (!granted) {
+			throw new OHAPIException(new OHExceptionMessage("Forbidden: bills.read is needed."), HttpStatus.FORBIDDEN);
+		}
 	}
 
 	/**
