@@ -235,30 +235,15 @@ public class OperationController {
 	@PostMapping("/operations/rows")
 	@ResponseStatus(HttpStatus.CREATED)
 	public OperationRowDTO newOperationRow(@RequestBody OperationRowDTO operationRowDTO) throws OHServiceException {
-		int code = operationRowDTO.getAdmission().getId();
-		LOGGER.info("Create operation: {}.", code);
-
+		LOGGER.info("Create operation row.");
 		if (operationRowDTO.getAdmission() == null && operationRowDTO.getOpd() == null) {
 			throw new OHAPIException(new OHExceptionMessage("At least one field between admission and Opd is required."));
 		}
-		OperationRow opRow = opRowMapper.map2Model(operationRowDTO);
-
-		OperationRow createOpeRow = operationRowManager.newOperationRow(opRow);
-		List<OperationRow> opRowFounds = operationRowManager.getOperationRowByAdmission(opRow.getAdmission())
-			.stream()
-			.filter(op -> op.getAdmission().getId() == code)
-			.toList();
-
-		OperationRow opCreated = null;
-		if (!opRowFounds.isEmpty()) {
-			opCreated = opRowFounds.get(0);
-		}
-
-		if (createOpeRow == null || opCreated == null) {
+		OperationRow createOpeRow = operationRowManager.newOperationRow(opRowMapper.map2Model(operationRowDTO));
+		if (createOpeRow == null) {
 			throw new OHAPIException(new OHExceptionMessage("Operation row not created."));
 		}
-
-		return opRowMapper.map2DTO(opCreated);
+		return opRowMapper.map2DTO(createOpeRow);
 	}
 
 	/**
@@ -276,8 +261,11 @@ public class OperationController {
 		}
 		OperationRow opRow = opRowMapper.map2Model(operationRowDTO);
 
-		List<OperationRow> opRowFounds = operationRowManager.getOperationRowByAdmission(opRow.getAdmission())
-			.stream()
+		// the row of an OPD visit has no admission
+		List<OperationRow> rows = opRow.getAdmission() != null
+			? operationRowManager.getOperationRowByAdmission(opRow.getAdmission())
+			: operationRowManager.getOperationRowByOpd(opRow.getOpd());
+		List<OperationRow> opRowFounds = rows.stream()
 			.filter(op -> op.getId() == opRow.getId())
 			.toList();
 
