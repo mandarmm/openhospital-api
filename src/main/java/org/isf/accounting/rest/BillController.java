@@ -35,6 +35,7 @@ import org.isf.accounting.mapper.BillPaymentsMapper;
 import org.isf.accounting.model.Bill;
 import org.isf.accounting.model.BillItems;
 import org.isf.accounting.model.BillPayments;
+import org.isf.admission.manager.AdmissionBrowserManager;
 import org.isf.patient.manager.PatientBrowserManager;
 import org.isf.patient.model.Patient;
 import org.isf.priceslist.manager.PriceListManager;
@@ -76,6 +77,8 @@ public class BillController {
 
 	private final PatientBrowserManager patientManager;
 
+	private final AdmissionBrowserManager admissionManager;
+
 	private final BillMapper billMapper;
 
 	private final BillItemsMapper billItemsMapper;
@@ -86,6 +89,7 @@ public class BillController {
 		BillBrowserManager billManager,
 		PriceListManager priceListManager,
 		PatientBrowserManager patientManager,
+		AdmissionBrowserManager admissionManager,
 		BillMapper billMapper,
 		BillItemsMapper billItemsMapper,
 		BillPaymentsMapper billPaymentsMapper
@@ -93,6 +97,7 @@ public class BillController {
 		this.billManager = billManager;
 		this.priceListManager = priceListManager;
 		this.patientManager = patientManager;
+		this.admissionManager = admissionManager;
 		this.billMapper = billMapper;
 		this.billItemsMapper = billItemsMapper;
 		this.billPaymentsMapper = billPaymentsMapper;
@@ -115,6 +120,10 @@ public class BillController {
 
 		Bill bill = billMapper.map2Model(newBillDto.getBill());
 		setPatientAndList(bill, newBillDto.getBill());
+		// as the desktop client: the bill of an admitted patient belongs to the admission
+		if (bill.getBillPatient() != null) {
+			bill.setAdmission(admissionManager.getCurrentAdmission(bill.getBillPatient()));
+		}
 
 		List<BillItems> billItems = billItemsMapper.map2ModelList(listOrEmpty(newBillDto.getBillItems()));
 		List<BillPayments> billPayments = billPaymentsMapper.map2ModelList(listOrEmpty(newBillDto.getBillPayments()));
@@ -138,12 +147,15 @@ public class BillController {
 		if (odBillDto == null || odBillDto.getBill() == null) {
 			throw new OHAPIException(new OHExceptionMessage("Bill is null."));
 		}
-		if (billManager.getBill(id) == null) {
+		Bill stored = billManager.getBill(id);
+		if (stored == null) {
 			throw new OHAPIException(new OHExceptionMessage("Bill to update not found."), HttpStatus.NOT_FOUND);
 		}
 		Bill bill = billMapper.map2Model(odBillDto.getBill());
 		bill.setId(id);
 		setPatientAndList(bill, odBillDto.getBill());
+		// the admission stays as when the bill was made
+		bill.setAdmission(stored.getAdmission());
 
 		List<BillItems> billItems = billItemsMapper.map2ModelList(listOrEmpty(odBillDto.getBillItems()));
 		List<BillPayments> billPayments = billPaymentsMapper.map2ModelList(listOrEmpty(odBillDto.getBillPayments()));

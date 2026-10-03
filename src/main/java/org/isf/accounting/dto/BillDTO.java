@@ -82,6 +82,9 @@ public class BillDTO {
 	@Schema(description = "Lock", example = "0")
 	private int lock;
 
+	@Schema(description = "The admission of the patient when the bill was made, if admitted (read only)", accessMode = Schema.AccessMode.READ_ONLY)
+	private Integer admissionId;
+
 	public Integer getId() {
 		return this.id;
 	}
@@ -192,5 +195,13 @@ public class BillDTO {
 
 	public void setLock(int lock) {
 		this.lock = lock;
+	}
+
+	public Integer getAdmissionId() {
+		return admissionId;
+	}
+
+	public void setAdmissionId(Integer admissionId) {
+		this.admissionId = admissionId;
 	}
 }
