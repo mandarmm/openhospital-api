@@ -44,6 +44,7 @@ import org.isf.utils.exception.OHServiceException;
 import org.isf.utils.exception.model.OHExceptionMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -87,6 +88,7 @@ public class StatisticsReportsController {
 
 	private final Path baseFolder;
 
+	@Autowired
 	public StatisticsReportsController(JasperReportsManager reportsManager) {
 		this(reportsManager, Path.of("."));
 	}
