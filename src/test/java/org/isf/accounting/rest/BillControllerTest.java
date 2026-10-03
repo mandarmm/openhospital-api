@@ -25,9 +25,12 @@ import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -79,6 +82,7 @@ import org.isf.testing.rest.ControllerBaseTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.modelmapper.ModelMapper;
@@ -304,7 +308,9 @@ class BillControllerTest extends ControllerBaseTest {
 			)
 			.andDo(log())
 			.andExpect(status().isOk())
-			.andExpect(content().string(containsString(FullBillDTOHelper.asJsonString(newFullBillDTO))))
+			// the bill as stored, not the request
+			.andExpect(content().string(containsString("\"id\":" + bill.getId())))
+			.andExpect(content().string(containsString("\"patientTrue\":" + bill.isPatient())))
 			.andReturn();
 	}
 
@@ -573,4 +579,51 @@ class BillControllerTest extends ControllerBaseTest {
 			.andReturn();
 	}
 
+
+	@Test
+	void when_get_bill_with_missing_id_then_NotFound() throws Exception {
+		when(billManagerMock.getBill(999)).thenReturn(null);
+
+		this.mockMvc.perform(get("/bills/{id}", 999)).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void when_post_bill_without_patient_then_stored_without_patient_and_returned_with_its_id() throws Exception {
+		FullBillDTO newFullBillDTO = FullBillDTOHelper.setup(patientMapper, billItemsMapper, billPaymentsMapper);
+		newFullBillDTO.getBill().setPatientTrue(false);
+		newFullBillDTO.getBill().setPatient(null);
+		newFullBillDTO.getBill().setPatName("Walk-in customer");
+		Bill stored = BillHelper.setup();
+		stored.setId(42);
+		stored.setIsPatient(false);
+		stored.setBillPatient(null);
+		PriceList priceList = stored.getPriceList();
+		newFullBillDTO.getBill().setListId(priceList.getId());
+		when(priceListManagerMock.getLists()).thenReturn(List.of(priceList));
+		when(billManagerMock.newBill(any(Bill.class), any(), any())).thenReturn(stored);
+		when(billManagerMock.getBill(42)).thenReturn(stored);
+
+		this.mockMvc
+			.perform(post("/bills").contentType(MediaType.APPLICATION_JSON).content(Objects.requireNonNull(FullBillDTOHelper.asJsonString(newFullBillDTO))))
+			.andExpect(status().isCreated())
+			.andExpect(content().string(containsString("\"id\":42")))
+			.andExpect(content().string(containsString("\"patientTrue\":false")));
+
+		ArgumentCaptor<Bill> created = ArgumentCaptor.forClass(Bill.class);
+		verify(billManagerMock).newBill(created.capture(), any(), any());
+		assertThat(created.getValue().isPatient(), is(false));
+		assertThat(created.getValue().getBillPatient(), nullValue());
+		assertThat(created.getValue().getPatName(), is("Walk-in customer"));
+	}
+
+	@Test
+	void when_mapping_a_patients_bill_then_the_flag_is_kept_both_ways() throws Exception {
+		Bill bill = BillHelper.setup();
+		bill.setIsPatient(true);
+		BillDTO dto = billMapper.map2DTO(bill);
+		assertThat(dto.isPatientTrue(), is(true));
+		assertThat(dto.getPatient().getCode(), is(bill.getBillPatient().getCode()));
+		assertThat(dto.getListId(), is(bill.getPriceList().getId()));
+		assertThat(billMapper.map2Model(dto).isPatient(), is(true));
+	}
 }
