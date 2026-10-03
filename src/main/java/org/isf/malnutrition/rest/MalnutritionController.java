@@ -21,10 +21,9 @@
  */
 package org.isf.malnutrition.rest;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 
 import org.isf.malnutrition.dto.MalnutritionDTO;
@@ -38,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -149,26 +149,19 @@ public class MalnutritionController {
 	 * @throws OHServiceException When failed to delete malnutrition
 	 */
 	@DeleteMapping(value = "/malnutritions")
+	@Transactional
 	public boolean deleteMalnutrition(@RequestParam int code) throws OHServiceException{
-		Malnutrition  malnutrition = manager.getMalnutrition(code);
-		List<Malnutrition> malnutritions = manager.getMalnutrition(String.valueOf(malnutrition.getAdmission().getId()));
-		List<Malnutrition> matchedMalnutritions = new ArrayList<>();
-		if (malnutritions != null) {
-			matchedMalnutritions = malnutritions
-				.stream()
-				.filter(item -> item.getCode() == code)
-				.collect(Collectors.toList());
-		}
-
-		if (matchedMalnutritions.isEmpty()) {
-			throw new OHAPIException(new OHExceptionMessage("Malnutrition control not found."));
-		}
-
+		// the core gives a reference that is read in this transaction (without it: an error 500, no session)
+		Malnutrition malnutrition;
 		try {
-			manager.deleteMalnutrition(matchedMalnutritions.get(0));
-			return true;
-		} catch (OHServiceException serviceException) {
-			throw new OHAPIException(new OHExceptionMessage("Malnutrition not deleted."));
+			malnutrition = manager.getMalnutrition(code);
+			if (malnutrition == null || malnutrition.getAdmission() == null) {
+				throw new OHAPIException(new OHExceptionMessage("Malnutrition control not found."), HttpStatus.NOT_FOUND);
+			}
+		} catch (EntityNotFoundException notFound) {
+			throw new OHAPIException(new OHExceptionMessage("Malnutrition control not found."), HttpStatus.NOT_FOUND);
 		}
+		manager.deleteMalnutrition(malnutrition);
+		return true;
 	}
 }
