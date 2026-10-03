@@ -38,12 +38,16 @@ import java.util.Optional;
 import org.isf.admission.manager.AdmissionBrowserManager;
 import org.isf.admission.model.Admission;
 import org.isf.generaldata.GeneralData;
+import org.isf.hospital.manager.HospitalBrowsingManager;
+import org.isf.lab.manager.LabManager;
 import org.isf.medicalinventory.manager.MedicalInventoryManager;
 import org.isf.medtype.manager.MedicalTypeBrowserManager;
 import org.isf.medtype.model.MedicalType;
 import org.isf.opd.manager.OpdBrowserManager;
 import org.isf.opd.model.Opd;
+import org.isf.patient.manager.PatientBrowserManager;
 import org.isf.patient.model.Patient;
+import org.isf.priceslist.manager.PriceListManager;
 import org.isf.shared.exceptions.OHResponseEntityExceptionHandler;
 import org.isf.stat.dto.JasperReportResultDto;
 import org.isf.stat.manager.JasperReportsManager;
@@ -79,6 +83,18 @@ class ScreenReportsControllerTest {
 	@Mock
 	private MedicalInventoryManager inventoryManagerMock;
 
+	@Mock
+	private PatientBrowserManager patientManagerMock;
+
+	@Mock
+	private LabManager labManagerMock;
+
+	@Mock
+	private PriceListManager priceListManagerMock;
+
+	@Mock
+	private HospitalBrowsingManager hospitalManagerMock;
+
 	private MockMvc mockMvc;
 
 	private AutoCloseable closeable;
@@ -91,7 +107,7 @@ class ScreenReportsControllerTest {
 		GeneralData.PHARMACEUTICALSTOCK = "PharmaceuticalStock_ver4";
 		this.mockMvc = MockMvcBuilders
 			.standaloneSetup(new ScreenReportsController(reportsManagerMock, opdManagerMock, admissionManagerMock, wardManagerMock,
-				medicalTypeManagerMock, inventoryManagerMock))
+				medicalTypeManagerMock, inventoryManagerMock, patientManagerMock, labManagerMock, priceListManagerMock, hospitalManagerMock))
 			.setControllerAdvice(new OHResponseEntityExceptionHandler())
 			.build();
 	}
@@ -163,5 +179,21 @@ class ScreenReportsControllerTest {
 	@Test
 	void testWardVisits_ofAKnownWard() throws Exception {
 		this.mockMvc.perform(get("/reports/ward-visits").param("wardCode", "ZZ").param("date", "2026-10-01")).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void testPatient_theSectionsAmongSwingsOptions() throws Exception {
+		GeneralData.PATIENTSHEET = "patient_clinical_sheet_ver3";
+		when(patientManagerMock.getPatientById(301)).thenReturn(patient(301));
+		when(reportsManagerMock.getGenericReportPatientVersion2Pdf(any(), any(), any(), any(), any())).thenReturn(emptyReport());
+
+		this.mockMvc.perform(get("/reports/patient/{code}", 301).param("dateFrom", "2022-01-01").param("dateTo", "2022-12-31")
+				.param("sections", "Opd", "Laboratory"))
+			.andExpect(status().isOk());
+		verify(reportsManagerMock).getGenericReportPatientVersion2Pdf(eq(301), eq("OpdLaboratory"), any(), any(), eq("patient_clinical_sheet_ver3"));
+
+		this.mockMvc.perform(get("/reports/patient/{code}", 301).param("dateFrom", "2022-01-01").param("dateTo", "2022-12-31")
+				.param("sections", "Opd", "Bills"))
+			.andExpect(status().isBadRequest());
 	}
 }
