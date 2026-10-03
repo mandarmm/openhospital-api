@@ -21,8 +21,11 @@
  */
 package org.isf.medicalinventory.rest;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,6 +46,7 @@ import org.isf.medicalinventory.model.MedicalInventoryRow;
 import org.isf.medicals.manager.MedicalBrowsingManager;
 import org.isf.medicals.model.Medical;
 import org.isf.medicalstock.manager.MovStockInsertingManager;
+import org.isf.medicalstock.dto.LotDTO;
 import org.isf.medicalstock.mapper.LotMapper;
 import org.isf.medicalstock.model.Lot;
 import org.isf.shared.exceptions.OHAPIException;
@@ -152,6 +156,7 @@ public class MedicalInventoryController {
 			dto.getInventoryReference(), dto.getInventoryType(), dto.getWardCode());
 		copyParameters(dto, inventory);
 		MedicalInventory saved = inventoryManager.newMedicalInventory(inventory, List.of());
+		checkNewLotCodes(body.getRows());
 		for (MedicalInventoryRowDTO row : body.getRows()) {
 			rowManager.newMedicalInventoryRow(toModel(row, saved));
 		}
@@ -180,8 +185,13 @@ public class MedicalInventoryController {
 			.collect(Collectors.toMap(MedicalInventoryRow::getId, Function.identity()));
 		Set<Integer> kept = body.getRows().stream().map(MedicalInventoryRowDTO::getId).filter(Objects::nonNull).collect(Collectors.toSet());
 		List<MedicalInventoryRow> removed = stored.stream().filter(row -> !kept.contains(row.getId())).toList();
+		checkNewLotCodes(body.getRows());
 		if (!removed.isEmpty()) {
 			rowManager.deleteMedicalInventoryRows(new ArrayList<>(removed));
+			// as Swing: the lots created for removed rows go with them
+			for (MedicalInventoryRow row : removed) {
+				deleteNewLot(row);
+			}
 		}
 		for (MedicalInventoryRowDTO row : body.getRows()) {
 			MedicalInventoryRow existing = row.getId() == null ? null : storedById.get(row.getId());
@@ -190,6 +200,19 @@ public class MedicalInventoryController {
 			} else {
 				existing.setTheoreticQty(row.getTheoreticQty());
 				existing.setRealQty(row.getRealQty());
+				if (existing.isNewLot() || existing.getLot() == null) {
+					// the lot of a new row can still be chosen or changed (Swing's Lot button)
+					Lot lot = rowLot(row, existing.getMedical(), existing.getLot());
+					if (existing.getLot() != null && (lot == null || !existing.getLot().getCode().equals(lot.getCode()))) {
+						Lot replaced = existing.getLot();
+						existing.setLot(lot);
+						rowManager.updateMedicalInventoryRow(existing);
+						movStockInsertingManager.deleteLot(replaced);
+					} else {
+						existing.setLot(lot);
+					}
+					existing.setNewLot(true);
+				}
 				rowManager.updateMedicalInventoryRow(existing);
 			}
 		}
@@ -281,6 +304,9 @@ public class MedicalInventoryController {
 		if (rows.stream().anyMatch(row -> row.getLot() == null)) {
 			throw new OHAPIException(new OHExceptionMessage("angal.inventory.allinventoryrowshouldhavelotbeforevalidation.msg"));
 		}
+		if (rows.stream().anyMatch(row -> row.isNewLot() && row.getRealQty().signum() <= 0)) {
+			throw new OHAPIException(new OHExceptionMessage("angal.inventory.allinventoryrowswithnewlotshouldhaverealqtygreatterthanzero.msg"));
+		}
 		if (ward) {
 			return;
 		}
@@ -350,11 +376,72 @@ public class MedicalInventoryController {
 			throw new OHAPIException(new OHExceptionMessage("angal.inventory.pleaseinsertmedical.msg"));
 		}
 		Medical medical = medicalManager.getMedical(dto.getMedical().getCode());
-		Lot lot = dto.getLot() == null || dto.getLot().getCode() == null ? null : movStockInsertingManager.getLot(dto.getLot().getCode());
-		if (dto.getLot() != null && dto.getLot().getCode() != null && lot == null) {
-			throw new OHAPIException(new OHExceptionMessage("Lot not found: " + dto.getLot().getCode()));
+		MedicalInventoryRow row = new MedicalInventoryRow(null, dto.getTheoreticQty(), dto.getRealQty(), inventory, medical,
+			rowLot(dto, medical, null));
+		row.setNewLot(dto.isNewLot());
+		return row;
+	}
+
+	/**
+	 * The lot of a row: a stored lot, or for a row with a new lot (a medical counted that the store had no lot of), a
+	 * lot created now as Swing does when saving; without a code, the core numbers it. Lots of new rows are deleted
+	 * when the row is removed or the inventory canceled, and charged when it is confirmed.
+	 *
+	 * @param current the row's lot so far, if any
+	 */
+	private Lot rowLot(MedicalInventoryRowDTO dto, Medical medical, Lot current) throws OHServiceException {
+		LotDTO lotDTO = dto.getLot();
+		if (lotDTO == null) {
+			return null;
 		}
-		return new MedicalInventoryRow(null, dto.getTheoreticQty(), dto.getRealQty(), inventory, medical, lot);
+		String code = lotDTO.getCode() == null ? "" : lotDTO.getCode().trim();
+		if (current != null && current.getCode().equals(code)) {
+			return current;
+		}
+		if (!code.isEmpty()) {
+			Lot stored = movStockInsertingManager.getLot(code);
+			if (stored != null && !dto.isNewLot()) {
+				return stored;
+			}
+			if (stored != null) {
+				throw new OHAPIException(new OHExceptionMessage("angal.medicalstock.multiplecharging.theinsertedlotcodealreaedyexists.msg"));
+			}
+			if (!dto.isNewLot()) {
+				throw new OHAPIException(new OHExceptionMessage("Lot not found: " + code));
+			}
+		} else if (!dto.isNewLot()) {
+			return null;
+		}
+		if (lotDTO.getDueDate() == null) {
+			throw new OHAPIException(new OHExceptionMessage("The new lot needs an expiring date."));
+		}
+		LocalDate preparation = lotDTO.getPreparationDate() == null ? LocalDate.now() : lotDTO.getPreparationDate();
+		if (lotDTO.getDueDate().isBefore(preparation)) {
+			throw new OHAPIException(new OHExceptionMessage("angal.medicalstock.multiplecharging.expirydatebeforepreparationdate"));
+		}
+		Lot lot = new Lot(medical, code, preparation.atStartOfDay(), lotDTO.getDueDate().atTime(LocalTime.MAX),
+			lotDTO.getCost() == null ? BigDecimal.ZERO : lotDTO.getCost());
+		return movStockInsertingManager.storeLot(code, lot, medical);
+	}
+
+	/** Two new rows cannot get the same lot code. */
+	private static void checkNewLotCodes(List<MedicalInventoryRowDTO> rows) throws OHAPIException {
+		List<String> codes = rows.stream()
+			.filter(MedicalInventoryRowDTO::isNewLot)
+			.map(MedicalInventoryRowDTO::getLot)
+			.filter(Objects::nonNull)
+			.map(LotDTO::getCode)
+			.filter(code -> code != null && !code.isBlank())
+			.toList();
+		if (codes.size() != new HashSet<>(codes).size()) {
+			throw new OHAPIException(new OHExceptionMessage("angal.medicalstock.multiplecharging.theinsertedlotcodealreaedyexists.msg"));
+		}
+	}
+
+	private void deleteNewLot(MedicalInventoryRow row) throws OHServiceException {
+		if (row.isNewLot() && row.getLot() != null) {
+			movStockInsertingManager.deleteLot(row.getLot());
+		}
 	}
 
 	private MedicalInventoryDTO toDTO(MedicalInventory inventory) {
