@@ -33,8 +33,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.log;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
@@ -250,4 +252,20 @@ class VisitsControllerTest {
 		verify(visitManagerMock, never()).deleteVisit(any(Visit.class));
 	}
 
+
+	@Test
+	void testGetVisitsOfWard_ofTheDays() throws Exception {
+		List<Visit> visits = VisitHelper.setupVisitList(3);
+		visits.get(0).setDate(LocalDateTime.of(2026, 10, 1, 9, 0));
+		visits.get(1).setDate(LocalDateTime.of(2026, 10, 2, 9, 0));
+		visits.get(2).setDate(LocalDateTime.of(2026, 10, 5, 9, 0));
+		when(visitManagerMock.getVisitsWard("I")).thenReturn(visits);
+
+		this.mockMvc.perform(get("/visits/ward/{wardCode}", "I"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(3));
+		this.mockMvc.perform(get("/visits/ward/{wardCode}", "I").param("dateFrom", "2026-10-01").param("dateTo", "2026-10-02"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(2));
+	}
 }

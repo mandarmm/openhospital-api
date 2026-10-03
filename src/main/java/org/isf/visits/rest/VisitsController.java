@@ -21,6 +21,7 @@
  */
 package org.isf.visits.rest;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.isf.patient.manager.PatientBrowserManager;
@@ -34,6 +35,7 @@ import org.isf.visits.mapper.VisitMapper;
 import org.isf.visits.model.Visit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -43,6 +45,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -76,6 +79,24 @@ public class VisitsController {
 	 * @return NO_CONTENT if there aren't visitors, {@code List<VaccineDTO>} otherwise
 	 * @throws OHServiceException When failed to get patient visits
 	 */
+	/**
+	 * The visits of a ward (the desktop client's worksheet), optionally of the days from {@code dateFrom} to
+	 * {@code dateTo} (inclusive).
+	 */
+	@GetMapping("/visits/ward/{wardCode}")
+	public List<VisitDTO> getVisitsOfWard(
+		@PathVariable String wardCode,
+		@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+		@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo
+	) throws OHServiceException {
+		LOGGER.info("Get the visits of ward: {}", wardCode);
+		List<Visit> visits = visitManager.getVisitsWard(wardCode);
+		return mapper.map2DTOList(visits.stream()
+			.filter(visit -> dateFrom == null || visit.getDate() != null && !visit.getDate().toLocalDate().isBefore(dateFrom))
+			.filter(visit -> dateTo == null || visit.getDate() != null && !visit.getDate().toLocalDate().isAfter(dateTo))
+			.toList());
+	}
+
 	@GetMapping("/visits/patient/{patID}")
 	public List<VisitDTO> getVisit(@PathVariable("patID") int patID) throws OHServiceException {
 		LOGGER.info("Get visit related to patId: {}", patID);
