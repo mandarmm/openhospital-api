@@ -67,6 +67,7 @@ public class BillMapper extends GenericMapper<Bill, BillDTO> {
 		dto.setBalance(bill.getBalance());
 		dto.setUser(bill.getUser());
 		dto.setLock(bill.getLock());
+		dto.setAdmissionId(bill.getAdmission() == null ? null : bill.getAdmission().getId());
 		return dto;
 	}
 
