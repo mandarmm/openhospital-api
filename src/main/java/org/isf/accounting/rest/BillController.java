@@ -108,42 +108,20 @@ public class BillController {
 	@ResponseStatus(HttpStatus.CREATED)
 	public FullBillDTO newBill(@RequestBody FullBillDTO newBillDto) throws OHServiceException {
 
-		if (newBillDto == null) {
+		if (newBillDto == null || newBillDto.getBill() == null) {
 			throw new OHAPIException(new OHExceptionMessage("Bill is null."));
 		}
 		LOGGER.info("Create Bill {}", newBillDto);
 
 		Bill bill = billMapper.map2Model(newBillDto.getBill());
+		setPatientAndList(bill, newBillDto.getBill());
 
-		Patient pat = patientManager.getPatientById(bill.getBillPatient().getCode());
+		List<BillItems> billItems = billItemsMapper.map2ModelList(listOrEmpty(newBillDto.getBillItems()));
+		List<BillPayments> billPayments = billPaymentsMapper.map2ModelList(listOrEmpty(newBillDto.getBillPayments()));
 
-		List<PriceList> list = priceListManager.getLists();
-
-		PriceList plist = list.stream().filter(priceList -> priceList.getName().equals(bill.getListName())).findAny().orElse(null);
-
-		if (pat != null) {
-			bill.setBillPatient(pat);
-		} else {
-			throw new OHAPIException(new OHExceptionMessage("Patient not found."));
-		}
-
-		if (plist != null) {
-			bill.setPriceList(plist);
-		} else {
-			throw new OHAPIException(new OHExceptionMessage("Price list not found."));
-		}
-
-		List<BillItems> billItems = billItemsMapper.map2ModelList(newBillDto.getBillItems());
-
-		List<BillPayments> billPayments = billPaymentsMapper.map2ModelList(newBillDto.getBillPayments());
-
-		try {
-			billManager.newBill(bill, billItems, billPayments);
-		} catch (OHServiceException e) {
-			throw new OHAPIException(new OHExceptionMessage("Bill is not created."));
-		}
-
-		return newBillDto;
+		// the core's messages (e.g. a bill needs an item, no bill in the future) reach the client
+		Bill created = billManager.newBill(bill, billItems, billPayments);
+		return fullBill(created.getId());
 	}
 
 	/**
@@ -157,43 +135,65 @@ public class BillController {
 	public FullBillDTO updateBill(@PathVariable Integer id, @RequestBody FullBillDTO odBillDto) throws OHServiceException {
 
 		LOGGER.info("updated Bill {}", odBillDto);
-		Bill bill = billMapper.map2Model(odBillDto.getBill());
-
-		bill.setId(id);
-
+		if (odBillDto == null || odBillDto.getBill() == null) {
+			throw new OHAPIException(new OHExceptionMessage("Bill is null."));
+		}
 		if (billManager.getBill(id) == null) {
-			throw new OHAPIException(new OHExceptionMessage("Bill to update not found."));
+			throw new OHAPIException(new OHExceptionMessage("Bill to update not found."), HttpStatus.NOT_FOUND);
 		}
+		Bill bill = billMapper.map2Model(odBillDto.getBill());
+		bill.setId(id);
+		setPatientAndList(bill, odBillDto.getBill());
 
-		Patient pat = patientManager.getPatientById(bill.getBillPatient().getCode());
+		List<BillItems> billItems = billItemsMapper.map2ModelList(listOrEmpty(odBillDto.getBillItems()));
+		List<BillPayments> billPayments = billPaymentsMapper.map2ModelList(listOrEmpty(odBillDto.getBillPayments()));
 
-		List<PriceList> list = priceListManager.getLists();
+		billManager.updateBill(bill, billItems, billPayments);
+		return fullBill(id);
+	}
 
-		PriceList plist = list.stream().filter(pricel -> pricel.getName().equals(bill.getListName())).findAny().orElse(null);
-
-		if (pat != null) {
+	/**
+	 * The bill's patient, when it is a patient's bill (a bill can also be for someone without a record, by name), and
+	 * its price list, by id or else by name.
+	 */
+	private void setPatientAndList(Bill bill, BillDTO dto) throws OHServiceException {
+		if (dto.isPatientTrue()) {
+			if (dto.getPatient() == null || dto.getPatient().getCode() == null) {
+				throw new OHAPIException(new OHExceptionMessage("The patient of the bill is missing."));
+			}
+			Patient pat = patientManager.getPatientById(dto.getPatient().getCode());
+			if (pat == null) {
+				throw new OHAPIException(new OHExceptionMessage("Patient not found."));
+			}
 			bill.setBillPatient(pat);
+			if (bill.getPatName() == null || bill.getPatName().isBlank()) {
+				bill.setPatName(pat.getName());
+			}
 		} else {
-			throw new OHAPIException(new OHExceptionMessage("Patient not found."));
+			bill.setBillPatient(null);
 		}
-
-		if (plist != null) {
-			bill.setPriceList(plist);
-		} else {
+		PriceList plist = priceListManager.getLists().stream()
+			.filter(priceList -> dto.getListId() != null ? priceList.getId() == dto.getListId() : priceList.getName().equals(dto.getListName()))
+			.findAny()
+			.orElse(null);
+		if (plist == null) {
 			throw new OHAPIException(new OHExceptionMessage("Price list not found."));
 		}
+		bill.setPriceList(plist);
+		bill.setListName(plist.getName());
+	}
 
-		List<BillItems> billItems = billItemsMapper.map2ModelList(odBillDto.getBillItems());
+	/** The bill as stored, with its items and payments. */
+	private FullBillDTO fullBill(int id) throws OHServiceException {
+		FullBillDTO full = new FullBillDTO();
+		full.setBill(billMapper.map2DTO(billManager.getBill(id)));
+		full.setBillItems(billItemsMapper.map2DTOList(billManager.getItems(id)));
+		full.setBillPayments(billPaymentsMapper.map2DTOList(billManager.getPayments(id)));
+		return full;
+	}
 
-		List<BillPayments> billPayments = billPaymentsMapper.map2ModelList(odBillDto.getBillPayments());
-
-		try {
-			billManager.updateBill(bill, billItems, billPayments);
-		} catch (OHServiceException e) {
-			throw new OHAPIException(new OHExceptionMessage("Bill is not updated."));
-		}
-
-		return odBillDto;
+	private static <T> List<T> listOrEmpty(List<T> list) {
+		return list == null ? List.of() : list;
 	}
 
 	/**
@@ -290,14 +290,10 @@ public class BillController {
 		LOGGER.info("Get bill with id: {}", id);
 
 		Bill bill = billManager.getBill(id);
-
-		BillDTO billDTO = billMapper.map2DTO(bill);
-
-		if (billDTO == null) {
+		if (bill == null) {
 			throw new OHAPIException(new OHExceptionMessage("Bill not found with ID :" + id), HttpStatus.NOT_FOUND);
 		}
-
-		return billDTO;
+		return billMapper.map2DTO(bill);
 	}
 
 	/**
@@ -375,12 +371,7 @@ public class BillController {
 			throw new OHAPIException(new OHExceptionMessage("Bill not found with ID :" + id), HttpStatus.NOT_FOUND);
 		}
 
-		try {
-			billManager.deleteBill(bill);
-		} catch (OHServiceException e) {
-			throw new OHAPIException(new OHExceptionMessage("Bill is not deleted."));
-		}
-
+		billManager.deleteBill(bill);
 		return true;
 	}
 
