@@ -115,8 +115,19 @@ public class DicomController {
 	/** The image's thumbnail (JPEG, 100 pixels wide). */
 	@GetMapping(value = "/dicom/patients/{code}/series/{series}/files/{id}/thumbnail", produces = MediaType.IMAGE_JPEG_VALUE)
 	public byte[] getThumbnail(@PathVariable int code, @PathVariable String series, @PathVariable long id) throws OHServiceException {
+		checkPatient(code);
+		// the file system manager reads the stored thumbnail only with the series' first images
+		FileDicom[] firsts = manager().loadPatientFiles(code);
+		for (FileDicom first : firsts == null ? new FileDicom[0] : firsts) {
+			if (first.getIdFile() == id && series.equals(first.getDicomSeriesNumber()) && first.getDicomThumbnail() != null) {
+				return bytes(first.getDicomThumbnail());
+			}
+		}
 		FileDicom file = load(code, series, id);
-		return bytes(file.getDicomThumbnail());
+		if (file.getDicomThumbnail() != null) {
+			return bytes(file.getDicomThumbnail());
+		}
+		return thumbnail(image(file), file.getFileName());
 	}
 
 	/** The image: a JPEG as it was loaded, a DICOM file's first frame as PNG. */
@@ -127,7 +138,52 @@ public class DicomController {
 		if (isJpeg(file.getFileName())) {
 			return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(data);
 		}
-		return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(dicomToPng(data, file.getFileName()));
+		return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(png(readDicom(data, file.getFileName())));
+	}
+
+	private static BufferedImage image(FileDicom file) throws OHServiceException {
+		byte[] data = bytes(file.getDicomData() == null ? null : file.getDicomData().getData());
+		if (!isJpeg(file.getFileName())) {
+			return readDicom(data, file.getFileName());
+		}
+		try {
+			BufferedImage image = ImageIO.read(new java.io.ByteArrayInputStream(data));
+			if (image == null) {
+				throw new IOException("Not an image");
+			}
+			return image;
+		} catch (IOException e) {
+			throw new OHAPIException(new OHExceptionMessage(MessageBundle.formatMessage("angal.dicom.thefileisinanunknownformat.fmt.msg", file.getFileName())));
+		}
+	}
+
+	/** As the core's loader makes them: 100 pixels wide, JPEG. */
+	private static byte[] thumbnail(BufferedImage image, String fileName) throws OHServiceException {
+		int height = Math.max(1, image.getHeight() * 100 / Math.max(1, image.getWidth()));
+		BufferedImage scaled = new BufferedImage(100, height, BufferedImage.TYPE_INT_RGB);
+		java.awt.Graphics2D graphics = scaled.createGraphics();
+		graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+		graphics.drawImage(image, 0, 0, 100, height, null);
+		graphics.dispose();
+		try {
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			ImageIO.write(scaled, "jpeg", out);
+			return out.toByteArray();
+		} catch (IOException e) {
+			LOGGER.error("Cannot make the thumbnail of {}.", fileName, e);
+			throw new OHAPIException(new OHExceptionMessage("Cannot read the image."));
+		}
+	}
+
+	private static byte[] png(BufferedImage image) throws OHServiceException {
+		try {
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			ImageIO.write(image, "png", out);
+			return out.toByteArray();
+		} catch (IOException e) {
+			LOGGER.error("Cannot write the image.", e);
+			throw new OHAPIException(new OHExceptionMessage("Cannot read the image."));
+		}
 	}
 
 	/**
@@ -251,7 +307,7 @@ public class DicomController {
 	}
 
 	/** The first frame, as the desktop client's viewer reads it. */
-	private static byte[] dicomToPng(byte[] data, String fileName) throws OHServiceException {
+	private static BufferedImage readDicom(byte[] data, String fileName) throws OHServiceException {
 		Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("DICOM");
 		if (!readers.hasNext()) {
 			throw new OHAPIException(new OHExceptionMessage("No DICOM reader."));
@@ -259,10 +315,7 @@ public class DicomController {
 		ImageReader reader = readers.next();
 		try (ImageInputStream in = ImageIO.createImageInputStream(new java.io.ByteArrayInputStream(data))) {
 			reader.setInput(in, false);
-			BufferedImage image = reader.read(0, reader.getDefaultReadParam());
-			ByteArrayOutputStream out = new ByteArrayOutputStream();
-			ImageIO.write(image, "png", out);
-			return out.toByteArray();
+			return reader.read(0, reader.getDefaultReadParam());
 		} catch (IOException | RuntimeException e) {
 			LOGGER.error("Cannot read the DICOM image.", e);
 			throw new OHAPIException(new OHExceptionMessage(MessageBundle.formatMessage("angal.dicom.thefileisnotindicomformat.fmt.msg", fileName)));
