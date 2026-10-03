@@ -21,19 +21,32 @@
  */
 package org.isf.stats.rest;
 
+import java.io.File;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.isf.admission.manager.AdmissionBrowserManager;
 import org.isf.admission.model.Admission;
 import org.isf.generaldata.GeneralData;
+import org.isf.hospital.manager.HospitalBrowsingManager;
+import org.isf.hospital.model.Hospital;
+import org.isf.lab.manager.LabManager;
 import org.isf.medicalinventory.manager.MedicalInventoryManager;
 import org.isf.medicalinventory.model.MedicalInventory;
 import org.isf.medtype.manager.MedicalTypeBrowserManager;
 import org.isf.medtype.model.MedicalType;
 import org.isf.opd.manager.OpdBrowserManager;
 import org.isf.opd.model.Opd;
+import org.isf.patient.manager.PatientBrowserManager;
+import org.isf.patient.model.Patient;
+import org.isf.priceslist.manager.PriceListManager;
+import org.isf.priceslist.model.PriceList;
 import org.isf.shared.exceptions.OHAPIException;
+import org.isf.stat.dto.JasperReportResultDto;
 import org.isf.stat.manager.JasperReportsManager;
 import org.isf.utils.exception.OHServiceException;
 import org.isf.utils.exception.model.OHExceptionMessage;
@@ -49,11 +62,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import net.sf.jasperreports.engine.JRException;
+import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JasperReport;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import net.sf.jasperreports.engine.util.JRLoader;
 
 /**
  * The prints of the desktop client's screens, as PDF: a patient's OPD visit, admission and discharge (patient folder),
  * the visits of a ward on a day, the main store's stock, average monthly consumption, order list and expiring lots
- * (pharmaceuticals), an inventory. The report files are the ones the installation's settings name.
+ * (pharmaceuticals), an inventory, a patient's report (version 2), the lab exams and a price list. The report files are
+ * the ones the installation's settings name.
  */
 @RestController
 @Tag(name = "Reports")
@@ -75,14 +94,30 @@ public class ScreenReportsController {
 
 	private final MedicalInventoryManager inventoryManager;
 
+	private final PatientBrowserManager patientManager;
+
+	private final LabManager labManager;
+
+	private final PriceListManager priceListManager;
+
+	private final HospitalBrowsingManager hospitalManager;
+
+	/** The sections of the patient report (Swing's patient report options); {@code All} for all of them. */
+	static final Set<String> PATIENT_SECTIONS = Set.of("All", "Drugs", "Examination", "Admission", "Opd", "Laboratory", "Operations");
+
 	public ScreenReportsController(JasperReportsManager reportsManager, OpdBrowserManager opdManager, AdmissionBrowserManager admissionManager,
-		WardBrowserManager wardManager, MedicalTypeBrowserManager medicalTypeManager, MedicalInventoryManager inventoryManager) {
+		WardBrowserManager wardManager, MedicalTypeBrowserManager medicalTypeManager, MedicalInventoryManager inventoryManager,
+		PatientBrowserManager patientManager, LabManager labManager, PriceListManager priceListManager, HospitalBrowsingManager hospitalManager) {
 		this.reportsManager = reportsManager;
 		this.opdManager = opdManager;
 		this.admissionManager = admissionManager;
 		this.wardManager = wardManager;
 		this.medicalTypeManager = medicalTypeManager;
 		this.inventoryManager = inventoryManager;
+		this.patientManager = patientManager;
+		this.labManager = labManager;
+		this.priceListManager = priceListManager;
+		this.hospitalManager = hospitalManager;
 	}
 
 	/** The report of an OPD visit (Swing patient folder: OPD chart). */
@@ -194,6 +229,85 @@ public class ScreenReportsController {
 			throw notFound("Inventory");
 		}
 		return ReportsController.pdf(reportsManager.getInventoryReportPdf(inventory, "Inventory", realQty ? 1 : 0), "Inventory_" + id + ".pdf");
+	}
+
+	/**
+	 * A patient's report of a period (Swing patient folder: patient report, version 2), with the chosen sections.
+	 *
+	 * @param sections {@code All} (default) or some of {@code Drugs}, {@code Examination}, {@code Admission}, {@code Opd},
+	 *            {@code Laboratory}, {@code Operations}
+	 */
+	@GetMapping(value = "/reports/patient/{code}", produces = MediaType.APPLICATION_PDF_VALUE)
+	public ResponseEntity<byte[]> printPatient(
+		@PathVariable int code,
+		@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+		@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+		@RequestParam(defaultValue = "All") List<String> sections
+	) throws OHServiceException {
+		if (patientManager.getPatientById(code) == null) {
+			throw notFound("Patient");
+		}
+		if (dateTo.isBefore(dateFrom)) {
+			throw new OHAPIException(new OHExceptionMessage("angal.opd.datefrommustbebefordateto.msg"));
+		}
+		if (sections.isEmpty() || !PATIENT_SECTIONS.containsAll(sections)) {
+			throw new OHAPIException(new OHExceptionMessage("The sections must be among " + PATIENT_SECTIONS + "."));
+		}
+		return ReportsController.pdf(reportsManager.getGenericReportPatientVersion2Pdf(code, String.join("", sections), dateFrom.atStartOfDay(),
+			dateTo.atStartOfDay(), GeneralData.PATIENTSHEET), "Patient_" + code + "_" + dateFrom + "_" + dateTo + ".pdf");
+	}
+
+	/**
+	 * The lab exams of a period (Swing laboratory: print the table), optionally of an exam (its description) or of a
+	 * patient.
+	 */
+	@GetMapping(value = "/reports/laboratory", produces = MediaType.APPLICATION_PDF_VALUE)
+	public ResponseEntity<byte[]> printLaboratory(
+		@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+		@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+		@RequestParam(required = false) String exam,
+		@RequestParam(required = false) Integer patientCode
+	) throws OHServiceException {
+		Patient patient = null;
+		if (patientCode != null) {
+			patient = patientManager.getPatientById(patientCode);
+			if (patient == null) {
+				throw notFound("Patient");
+			}
+		}
+		List<?> labs = labManager.getLaboratoryForPrint(exam == null || exam.isBlank() ? null : exam, dateFrom.atStartOfDay(), dateTo.atTime(LocalTime.MAX),
+			patient);
+		return ReportsController.pdf(fill("Laboratory", labs), "Laboratory_" + dateFrom + "_" + dateTo + ".pdf");
+	}
+
+	/** The prices of a list (Swing price lists: print). */
+	@GetMapping(value = "/reports/pricelist/{id}", produces = MediaType.APPLICATION_PDF_VALUE)
+	public ResponseEntity<byte[]> printPriceList(@PathVariable int id) throws OHServiceException {
+		PriceList list = priceListManager.getLists().stream().filter(candidate -> candidate.getId() == id).findFirst()
+			.orElseThrow(() -> notFound("Price list"));
+		return ReportsController.pdf(fill("PriceList", priceListManager.convertPrice(list, priceListManager.getPrices())),
+			"PriceList_" + list.getCode() + ".pdf");
+	}
+
+	/**
+	 * A report filled with rows the core prepared, as the desktop client's {@code PrintManager} does (which shows it in
+	 * a viewer on the computer instead).
+	 */
+	private JasperReportResultDto fill(String jasperFileName, List<?> rows) throws OHServiceException {
+		Hospital hospital = hospitalManager.getHospital();
+		Map<String, Object> parameters = new HashMap<>();
+		parameters.put("ospedaleNome", hospital.getDescription());
+		parameters.put("ospedaleIndirizzo", hospital.getAddress());
+		parameters.put("ospedaleCitta", hospital.getCity());
+		parameters.put("ospedaleTel", hospital.getTelephone());
+		parameters.put("ospedaleFax", hospital.getFax());
+		parameters.put("ospedaleMail", hospital.getEmail());
+		try {
+			JasperReport report = (JasperReport) JRLoader.loadObject(new File("rpt_base/" + jasperFileName + ".jasper"));
+			return new JasperReportResultDto(JasperFillManager.fillReport(report, parameters, new JRBeanCollectionDataSource(rows)), jasperFileName, null);
+		} catch (JRException e) {
+			throw new OHAPIException(new OHExceptionMessage("angal.stat.reporterror.msg"));
+		}
 	}
 
 	private Admission findAdmission(int id) throws OHServiceException {
