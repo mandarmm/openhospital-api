@@ -27,6 +27,7 @@ import org.isf.anamnesis.mapper.PatientHistoryMapper;
 import org.isf.anamnesis.model.PatientHistory;
 import org.isf.patient.manager.PatientBrowserManager;
 import org.isf.shared.exceptions.OHAPIException;
+import org.isf.utils.exception.OHDataLockFailureException;
 import org.isf.utils.exception.OHServiceException;
 import org.isf.utils.exception.model.OHExceptionMessage;
 import org.slf4j.Logger;
@@ -100,8 +101,12 @@ public class PatientHistoryController {
 		}
 		try {
 			return mapper.map2DTO(patientHistoryManager.saveOrUpdate(history));
-		} catch (OptimisticLockingFailureException e) {
-			throw new OHAPIException(new OHExceptionMessage("The patient history was changed by someone else."), HttpStatus.CONFLICT);
+		} catch (Exception e) {
+			// the core's lock failure is a checked exception its manager does not declare
+			if (e instanceof OHDataLockFailureException || e instanceof OptimisticLockingFailureException) {
+				throw new OHAPIException(new OHExceptionMessage("angal.sql.thedatahasbeenupdatedbysomeoneelse.msg"), HttpStatus.CONFLICT);
+			}
+			throw e;
 		}
 	}
 
