@@ -99,56 +99,12 @@ public class OpdDTO {
 
 	private int hashCode;
 
-	@Schema(description = "Reasons for entry")
-	private String reason; // ADDED: Arnaud
-
-	@Schema(description = "History of a medical or psychiatric patient")
-	private String anamnesis; // ADDED: Arnaud
-
-	@Schema(description = "Allergies of patient")
-	private String allergies; // ADDED: Arnaud
-
-	@Schema(description = "Current therapies")
-	private String therapies; // ADDED: Arnaud
-
 	@Schema(description = "Prescription", maxLength = 255)
 	private String prescription; // ADDED: Arnaud
 
 	@NotNull
 	@Schema(description = "Ward")
 	private WardDTO ward;
-
-	public String getReason() {
-		return reason;
-	}
-
-	public void setReason(String reason) {
-		this.reason = reason;
-	}
-
-	public String getAnamnesis() {
-		return anamnesis;
-	}
-
-	public void setAnamnesis(String anamnesis) {
-		this.anamnesis = anamnesis;
-	}
-
-	public String getAllergies() {
-		return allergies;
-	}
-
-	public void setAllergies(String allergies) {
-		this.allergies = allergies;
-	}
-
-	public String getTherapies() {
-		return therapies;
-	}
-
-	public void setTherapies(String therapies) {
-		this.therapies = therapies;
-	}
 
 	public String getPrescription() {
 		return prescription;
