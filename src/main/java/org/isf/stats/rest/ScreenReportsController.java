@@ -315,14 +315,18 @@ public class ScreenReportsController {
 		return ReportsController.pdf(fill("PriceList", new JRMapCollectionDataSource(new ArrayList<>(rows))), "PriceList_" + list.getCode() + ".pdf");
 	}
 
-	/** The receipt of a bill (Swing bills: receipt). */
+	/**
+	 * The receipt of a bill (Swing bills: receipt), or with {@code payments} the receipt of its payments (Swing bill:
+	 * payment receipt).
+	 */
 	@GetMapping(value = "/reports/bill/{id}", produces = MediaType.APPLICATION_PDF_VALUE)
-	public ResponseEntity<byte[]> printBill(@PathVariable int id) throws OHServiceException {
+	public ResponseEntity<byte[]> printBill(@PathVariable int id, @RequestParam(defaultValue = "false") boolean payments) throws OHServiceException {
 		checkBillsRead();
 		if (billManager.getBill(id) == null) {
 			throw notFound("Bill");
 		}
-		return ReportsController.pdf(reportsManager.getGenericReportBillPdf(id, GeneralData.PATIENTBILL, false, false), "Bill_" + id + ".pdf");
+		String report = payments ? "PatientBillPayments" : GeneralData.PATIENTBILL;
+		return ReportsController.pdf(reportsManager.getGenericReportBillPdf(id, report, false, false), report + "_" + id + ".pdf");
 	}
 
 	/** A patient's bills and payments (Swing bills: patient's statement). */
