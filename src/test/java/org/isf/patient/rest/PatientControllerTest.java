@@ -617,4 +617,44 @@ class PatientControllerTest {
             .andExpect(status().isOk())
             .andExpect(content().string(containsString(PatientHelper.asJsonString(patientMapper.map2DTOList(patientList)))));
     }
+
+	@Test
+	void merge_keeps_the_chosen_name_and_passes_on_the_core_reasons() throws Exception {
+		Patient kept = patient(2, "Kept", "Patient");
+		Patient deleted = patient(1, "Other", "Name");
+		when(patientBrowserManagerMock.getPatientById(2)).thenReturn(kept);
+		when(patientBrowserManagerMock.getPatientById(1)).thenReturn(deleted);
+
+		this.mockMvc.perform(post("/patients/merge").param("mergedcode", "2").param("code2", "1").param("nameOf", "1"))
+			.andExpect(status().isOk());
+		org.mockito.Mockito.verify(patientBrowserManagerMock).mergePatient(kept, deleted);
+		assertThat(kept.getName(), org.hamcrest.Matchers.equalTo("Other Name"));
+
+		doThrow(new org.isf.utils.exception.OHDataValidationException(
+			new org.isf.utils.exception.model.OHExceptionMessage("angal.admission.cannotmergeadmittedpatients.msg")))
+			.when(patientBrowserManagerMock).mergePatient(any(Patient.class), any(Patient.class));
+		this.mockMvc.perform(post("/patients/merge").param("mergedcode", "2").param("code2", "1"))
+			.andExpect(status().isBadRequest())
+			.andExpect(content().string(containsString("angal.admission.cannotmergeadmittedpatients.msg")));
+	}
+
+	@Test
+	void merge_of_an_unknown_patient_or_of_a_patient_with_itself_is_refused() throws Exception {
+		when(patientBrowserManagerMock.getPatientById(2)).thenReturn(patient(2, "Kept", "Patient"));
+		this.mockMvc.perform(post("/patients/merge").param("mergedcode", "2").param("code2", "3"))
+			.andExpect(status().isNotFound());
+		this.mockMvc.perform(post("/patients/merge").param("mergedcode", "2").param("code2", "2"))
+			.andExpect(status().isBadRequest());
+		this.mockMvc.perform(get("/patients/merge").param("mergedcode", "2").param("code2", "1"))
+			.andExpect(status().is4xxClientError());
+		org.mockito.Mockito.verify(patientBrowserManagerMock, org.mockito.Mockito.never()).mergePatient(any(Patient.class), any(Patient.class));
+	}
+
+	private static Patient patient(int code, String firstName, String secondName) {
+		Patient patient = new Patient();
+		patient.setCode(code);
+		patient.setFirstName(firstName);
+		patient.setSecondName(secondName);
+		return patient;
+	}
 }
