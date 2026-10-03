@@ -24,6 +24,7 @@ package org.isf.stats.rest;
 import java.io.File;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,8 @@ import org.isf.stat.manager.JasperReportsManager;
 import org.isf.utils.exception.OHServiceException;
 import org.isf.utils.exception.model.OHExceptionMessage;
 import org.isf.ward.manager.WardBrowserManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -62,10 +65,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import net.sf.jasperreports.engine.JRDataSource;
 import net.sf.jasperreports.engine.JRException;
 import net.sf.jasperreports.engine.JasperFillManager;
 import net.sf.jasperreports.engine.JasperReport;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import net.sf.jasperreports.engine.data.JRMapCollectionDataSource;
 import net.sf.jasperreports.engine.util.JRLoader;
 
 /**
@@ -78,6 +83,8 @@ import net.sf.jasperreports.engine.util.JRLoader;
 @Tag(name = "Reports")
 @SecurityRequirement(name = "bearerAuth")
 public class ScreenReportsController {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(ScreenReportsController.class);
 
 	/** The order of the stock report, as the desktop client's default (by type, then medical). */
 	private static final String STOCK_SORT = "MDSRT_DESC, MDSR_DESC";
@@ -277,7 +284,7 @@ public class ScreenReportsController {
 		}
 		List<?> labs = labManager.getLaboratoryForPrint(exam == null || exam.isBlank() ? null : exam, dateFrom.atStartOfDay(), dateTo.atTime(LocalTime.MAX),
 			patient);
-		return ReportsController.pdf(fill("Laboratory", labs), "Laboratory_" + dateFrom + "_" + dateTo + ".pdf");
+		return ReportsController.pdf(fill("Laboratory", new JRBeanCollectionDataSource(labs)), "Laboratory_" + dateFrom + "_" + dateTo + ".pdf");
 	}
 
 	/** The prices of a list (Swing price lists: print). */
@@ -285,15 +292,27 @@ public class ScreenReportsController {
 	public ResponseEntity<byte[]> printPriceList(@PathVariable int id) throws OHServiceException {
 		PriceList list = priceListManager.getLists().stream().filter(candidate -> candidate.getId() == id).findFirst()
 			.orElseThrow(() -> notFound("Price list"));
-		return ReportsController.pdf(fill("PriceList", priceListManager.convertPrice(list, priceListManager.getPrices())),
-			"PriceList_" + list.getCode() + ".pdf");
+		// the report's price is a Double, the core's a BigDecimal since the decimal precision change (step a121): the
+		// desktop client's print fails on it
+		List<Map<String, ?>> rows = priceListManager.convertPrice(list, priceListManager.getPrices()).stream()
+			.<Map<String, ?>> map(price -> {
+				Map<String, Object> row = new HashMap<>();
+				row.put("list", price.getList());
+				row.put("currency", price.getCurrency());
+				row.put("group", price.getGroup());
+				row.put("desc", price.getDesc());
+				row.put("price", price.getPrice() == null ? null : price.getPrice().doubleValue());
+				return row;
+			})
+			.toList();
+		return ReportsController.pdf(fill("PriceList", new JRMapCollectionDataSource(new ArrayList<>(rows))), "PriceList_" + list.getCode() + ".pdf");
 	}
 
 	/**
 	 * A report filled with rows the core prepared, as the desktop client's {@code PrintManager} does (which shows it in
 	 * a viewer on the computer instead).
 	 */
-	private JasperReportResultDto fill(String jasperFileName, List<?> rows) throws OHServiceException {
+	private JasperReportResultDto fill(String jasperFileName, JRDataSource rows) throws OHServiceException {
 		Hospital hospital = hospitalManager.getHospital();
 		Map<String, Object> parameters = new HashMap<>();
 		parameters.put("ospedaleNome", hospital.getDescription());
@@ -304,8 +323,9 @@ public class ScreenReportsController {
 		parameters.put("ospedaleMail", hospital.getEmail());
 		try {
 			JasperReport report = (JasperReport) JRLoader.loadObject(new File("rpt_base/" + jasperFileName + ".jasper"));
-			return new JasperReportResultDto(JasperFillManager.fillReport(report, parameters, new JRBeanCollectionDataSource(rows)), jasperFileName, null);
+			return new JasperReportResultDto(JasperFillManager.fillReport(report, parameters, rows), jasperFileName, null);
 		} catch (JRException e) {
+			LOGGER.error("Cannot fill the report {}.", jasperFileName, e);
 			throw new OHAPIException(new OHExceptionMessage("angal.stat.reporterror.msg"));
 		}
 	}
