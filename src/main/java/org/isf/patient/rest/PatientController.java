@@ -113,6 +113,13 @@ public class PatientController {
 			throw new OHAPIException(new OHExceptionMessage("Malformed picture."));
 		}
 		Patient patientModel = patientMapper.map2Model(newPatient);
+		// the database needs them: "unknown" when the client does not send them, as the desktop client's default
+		if (!StringUtils.hasText(patientModel.getMaritalStatus())) {
+			patientModel.setMaritalStatus("unknown");
+		}
+		if (!StringUtils.hasText(patientModel.getProfession())) {
+			patientModel.setProfession("unknown");
+		}
 		Patient patient = patientManager.savePatient(patientModel);
 
 		if (patient == null) {
