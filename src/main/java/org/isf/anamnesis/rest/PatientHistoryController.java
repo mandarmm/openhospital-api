@@ -21,6 +21,8 @@
  */
 package org.isf.anamnesis.rest;
 
+import java.lang.reflect.UndeclaredThrowableException;
+
 import org.isf.anamnesis.dto.PatientHistoryDTO;
 import org.isf.anamnesis.manager.PatientHistoryManager;
 import org.isf.anamnesis.mapper.PatientHistoryMapper;
@@ -102,8 +104,9 @@ public class PatientHistoryController {
 		try {
 			return mapper.map2DTO(patientHistoryManager.saveOrUpdate(history));
 		} catch (Exception e) {
-			// the core's lock failure is a checked exception its manager does not declare
-			if (e instanceof OHDataLockFailureException || e instanceof OptimisticLockingFailureException) {
+			// the core's lock failure is a checked exception its manager does not declare: the proxy wraps it
+			Throwable failure = e instanceof UndeclaredThrowableException ? e.getCause() : e;
+			if (failure instanceof OHDataLockFailureException || failure instanceof OptimisticLockingFailureException) {
 				throw new OHAPIException(new OHExceptionMessage("angal.sql.thedatahasbeenupdatedbysomeoneelse.msg"), HttpStatus.CONFLICT);
 			}
 			throw e;

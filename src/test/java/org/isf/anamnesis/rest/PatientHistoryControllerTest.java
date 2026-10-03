@@ -128,6 +128,13 @@ class PatientHistoryControllerTest {
 				.content(objectMapper.writeValueAsString(new PatientHistoryDTO())))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.message").value("angal.sql.thedatahasbeenupdatedbysomeoneelse.msg"));
+
+		// as the core's proxy delivers it
+		when(manager.saveOrUpdate(any(PatientHistory.class))).thenThrow(new java.lang.reflect.UndeclaredThrowableException(
+			new OHDataLockFailureException(new org.isf.utils.exception.model.OHExceptionMessage("angal.sql.thedatahasbeenupdatedbysomeoneelse.msg"))));
+		mvc.perform(put("/patients/{code}/history", 7).contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(new PatientHistoryDTO())))
+			.andExpect(status().isConflict());
 	}
 
 	@Test
