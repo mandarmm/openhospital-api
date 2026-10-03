@@ -320,21 +320,33 @@ public class PatientController {
 		}
 	}
 
-	@GetMapping(value = "/patients/merge")
-	public boolean mergePatients(@RequestParam int mergedcode, @RequestParam int code2) throws OHServiceException {
+	/**
+	 * Merges patient {@code code2} into patient {@code mergedcode}: {@code code2}'s history goes to {@code mergedcode},
+	 * which takes its missing details, and {@code code2} is deleted. It cannot be undone.
+	 *
+	 * @param mergedcode the patient kept
+	 * @param code2 the patient deleted
+	 * @param nameOf the code of the patient whose name is kept (the kept patient's by default)
+	 */
+	@PostMapping(value = "/patients/merge")
+	public boolean mergePatients(@RequestParam int mergedcode, @RequestParam int code2, @RequestParam(required = false) Integer nameOf)
+		throws OHServiceException {
 		LOGGER.info("Merge patient for code '{}' in patient for code '{}'.", code2, mergedcode);
+		if (mergedcode == code2) {
+			throw new OHAPIException(new OHExceptionMessage("A patient cannot be merged with itself."));
+		}
 		Patient mergedPatient = patientManager.getPatientById(mergedcode);
 		Patient patient2 = patientManager.getPatientById(code2);
 		if (mergedPatient == null || patient2 == null) {
 			throw new OHAPIException(new OHExceptionMessage("Patient not found."), HttpStatus.NOT_FOUND);
 		}
-
-		try {
-			patientManager.mergePatient(mergedPatient, patient2);
-			return true;
-		} catch (OHServiceException serviceException) {
-			throw new OHAPIException(new OHExceptionMessage("Patients not merged."));
+		if (nameOf != null && nameOf == code2) {
+			mergedPatient.setFirstName(patient2.getFirstName());
+			mergedPatient.setSecondName(patient2.getSecondName());
 		}
+		// the core's reasons (admitted, pending bills, different sex) reach the client
+		patientManager.mergePatient(mergedPatient, patient2);
+		return true;
 	}
 
 	@GetMapping(value = "/patients/cities")

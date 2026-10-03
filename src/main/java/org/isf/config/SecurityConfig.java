@@ -245,6 +245,15 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.PUT, "/patientconsensus/**").hasAuthority("patientconsensus.update")
 				.requestMatchers(HttpMethod.DELETE, "/patientconsensus/**").hasAuthority("patientconsensus.delete")
 				// patients
+				// merging deletes a patient
+				.requestMatchers(HttpMethod.POST, "/patients/merge")
+				.access((authentication, context) -> {
+					boolean hasUpdateAuthority = authentication.get().getAuthorities().stream()
+						.anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("patients.update"));
+					boolean hasDeleteAuthority = authentication.get().getAuthorities().stream()
+						.anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("patients.delete"));
+					return new AuthorizationDecision(hasUpdateAuthority && hasDeleteAuthority);
+				})
 				.requestMatchers(HttpMethod.POST, "/patients/**").hasAuthority("patients.create")
 				.requestMatchers(HttpMethod.GET, "/patients/**").hasAuthority("patients.read")
 				.requestMatchers(HttpMethod.PUT, "/patients/**").hasAuthority("patients.update")
