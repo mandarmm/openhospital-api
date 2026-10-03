@@ -68,6 +68,7 @@ class DicomControllerTest {
 	void an_unknown_patient_is_404() throws Exception {
 		mvc.perform(multipart("/dicom/patients/{code}", 8).file(file("image.jpg"))).andExpect(status().isNotFound());
 		mvc.perform(get("/dicom/patients/{code}", 8)).andExpect(status().isNotFound());
+		mvc.perform(get("/dicom/patients/{code}/series/{series}/files/{id}", 8, "1", 1)).andExpect(status().isNotFound());
 	}
 
 	@Test

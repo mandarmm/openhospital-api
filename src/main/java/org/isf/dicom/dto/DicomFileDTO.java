@@ -44,5 +44,9 @@ public record DicomFileDTO(
 	String studyDescription,
 	String modality,
 	String institutionName,
-	DicomTypeDTO type) {
+	DicomTypeDTO type,
+	String studyId,
+	String dicomPatientName,
+	String dicomPatientSex,
+	String dicomPatientAge) {
 }
