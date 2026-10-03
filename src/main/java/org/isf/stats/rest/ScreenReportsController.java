@@ -33,6 +33,8 @@ import java.util.Set;
 import org.isf.accounting.manager.BillBrowserManager;
 import org.isf.admission.manager.AdmissionBrowserManager;
 import org.isf.admission.model.Admission;
+import org.isf.examination.manager.ExaminationBrowserManager;
+import org.isf.examination.model.PatientExamination;
 import org.isf.generaldata.GeneralData;
 import org.isf.hospital.manager.HospitalBrowsingManager;
 import org.isf.hospital.model.Hospital;
@@ -114,13 +116,15 @@ public class ScreenReportsController {
 
 	private final BillBrowserManager billManager;
 
+	private final ExaminationBrowserManager examinationManager;
+
 	/** The sections of the patient report (Swing's patient report options); {@code All} for all of them. */
 	static final Set<String> PATIENT_SECTIONS = Set.of("All", "Drugs", "Examination", "Admission", "Opd", "Laboratory", "Operations");
 
 	public ScreenReportsController(JasperReportsManager reportsManager, OpdBrowserManager opdManager, AdmissionBrowserManager admissionManager,
 		WardBrowserManager wardManager, MedicalTypeBrowserManager medicalTypeManager, MedicalInventoryManager inventoryManager,
 		PatientBrowserManager patientManager, LabManager labManager, PriceListManager priceListManager, HospitalBrowsingManager hospitalManager,
-		BillBrowserManager billManager) {
+		BillBrowserManager billManager, ExaminationBrowserManager examinationManager) {
 		this.reportsManager = reportsManager;
 		this.opdManager = opdManager;
 		this.admissionManager = admissionManager;
@@ -132,6 +136,7 @@ public class ScreenReportsController {
 		this.priceListManager = priceListManager;
 		this.hospitalManager = hospitalManager;
 		this.billManager = billManager;
+		this.examinationManager = examinationManager;
 	}
 
 	/** The report of an OPD visit (Swing patient folder: OPD chart). */
@@ -349,6 +354,17 @@ public class ScreenReportsController {
 		checkBillsRead();
 		return ReportsController.pdf(reportsManager.getGenericReportUserInDatePdf(date + " 00:00:00", date + " 23:59:59", user, "BillsReportUserInDate"),
 			"BillsClosure_" + user + "_" + date + ".pdf");
+	}
+
+	/** A patient's examination (Swing examination: print). */
+	@GetMapping(value = "/reports/examination/{id}", produces = MediaType.APPLICATION_PDF_VALUE)
+	public ResponseEntity<byte[]> printExamination(@PathVariable int id) throws OHServiceException {
+		PatientExamination examination = examinationManager.getByID(id);
+		if (examination == null) {
+			throw notFound("Examination");
+		}
+		return ReportsController.pdf(reportsManager.getGenericReportPatientExaminationPdf(examination.getPatient().getCode(), id,
+			GeneralData.EXAMINATIONCHART), "Examination_" + id + ".pdf");
 	}
 
 	/** The bills' reports show billing: they need the bills permission too. */

@@ -39,6 +39,7 @@ import org.isf.accounting.manager.BillBrowserManager;
 import org.isf.accounting.model.Bill;
 import org.isf.admission.manager.AdmissionBrowserManager;
 import org.isf.admission.model.Admission;
+import org.isf.examination.manager.ExaminationBrowserManager;
 import org.isf.generaldata.GeneralData;
 import org.isf.hospital.manager.HospitalBrowsingManager;
 import org.isf.lab.manager.LabManager;
@@ -103,6 +104,9 @@ class ScreenReportsControllerTest {
 	@Mock
 	private BillBrowserManager billManagerMock;
 
+	@Mock
+	private ExaminationBrowserManager examinationManagerMock;
+
 	private MockMvc mockMvc;
 
 	private AutoCloseable closeable;
@@ -116,7 +120,7 @@ class ScreenReportsControllerTest {
 		this.mockMvc = MockMvcBuilders
 			.standaloneSetup(new ScreenReportsController(reportsManagerMock, opdManagerMock, admissionManagerMock, wardManagerMock,
 				medicalTypeManagerMock, inventoryManagerMock, patientManagerMock, labManagerMock, priceListManagerMock, hospitalManagerMock,
-				billManagerMock))
+				billManagerMock, examinationManagerMock))
 			.setControllerAdvice(new OHResponseEntityExceptionHandler())
 			.build();
 	}
