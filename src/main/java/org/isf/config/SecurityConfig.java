@@ -296,6 +296,10 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.DELETE, "/users/**").hasAuthority("users.delete")
 				// user setting
 				.requestMatchers("/usersettings/**").authenticated()
+				// dicom: a patient's images, under the patients' permissions; deleting a series destroys images
+				.requestMatchers(HttpMethod.GET, "/dicom/**").hasAuthority("patients.read")
+				.requestMatchers(HttpMethod.POST, "/dicom/**").hasAuthority("patients.update")
+				.requestMatchers(HttpMethod.DELETE, "/dicom/**").hasAuthority("patients.delete")
 				// dicomtypes: everybody may read them (needed to attach images); changing them is an administration task
 				.requestMatchers(HttpMethod.GET, "/dicomtypes/**").authenticated()
 				.requestMatchers(HttpMethod.POST, "/dicomtypes/**").hasAuthority("admin.access")
