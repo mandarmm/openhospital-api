@@ -108,6 +108,8 @@ public class SecurityConfig {
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers("/", "/healthcheck").permitAll()
 				.requestMatchers("/auth/login", "/auth/refresh-token").permitAll()
+				// Open Hospital's version: any user (the clients show it and open the manual of the version)
+				.requestMatchers(HttpMethod.GET, "/version").authenticated()
 				.requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
 				// admissions
 				.requestMatchers(HttpMethod.POST, "/admissions/**").hasAuthority("admissions.create")
