@@ -226,4 +226,67 @@ class MedicalInventoryControllerTest {
 			.andExpect(status().isBadRequest());
 		verify(inventoryManagerMock, never()).deleteInventory(any());
 	}
+
+	@Test
+	void testNewInventory_storesTheNewLotOfARow() throws Exception {
+		when(medicalManagerMock.getMedical(40)).thenReturn(new Medical(40));
+		when(movStockInsertingManagerMock.storeLot(eq(""), any(), any())).thenAnswer(invocation -> {
+			Lot lot = invocation.getArgument(1);
+			lot.setCode("AUTO1");
+			return lot;
+		});
+		when(inventoryManagerMock.newMedicalInventory(any(), anyList())).thenAnswer(invocation -> {
+			MedicalInventory saved = invocation.getArgument(0);
+			saved.setId(5);
+			return saved;
+		});
+		String body = """
+			{"inventory":{"inventoryDate":"2026-10-01T09:00:00","inventoryReference":"INV-1","inventoryType":"main"},
+			 "rows":[{"theoreticQty":0,"realQty":12,"medical":{"code":40},"newLot":true,
+			          "lot":{"preparationDate":"2026-09-01","dueDate":"2028-06-30","cost":1.5}}]}""";
+
+		this.mockMvc.perform(post("/medicalinventories").contentType(MediaType.APPLICATION_JSON).content(body))
+			.andExpect(status().isCreated());
+
+		ArgumentCaptor<Lot> lot = ArgumentCaptor.forClass(Lot.class);
+		verify(movStockInsertingManagerMock).storeLot(eq(""), lot.capture(), any());
+		assertThat(lot.getValue().getDueDate().toLocalDate()).isEqualTo("2028-06-30");
+		assertThat(lot.getValue().getCost()).isEqualByComparingTo("1.5");
+		ArgumentCaptor<MedicalInventoryRow> row = ArgumentCaptor.forClass(MedicalInventoryRow.class);
+		verify(rowManagerMock).newMedicalInventoryRow(row.capture());
+		assertThat(row.getValue().isNewLot()).isTrue();
+		assertThat(row.getValue().getLot().getCode()).isEqualTo("AUTO1");
+	}
+
+	@Test
+	void testNewInventory_aNewLotCannotReuseACode() throws Exception {
+		when(medicalManagerMock.getMedical(40)).thenReturn(new Medical(40));
+		when(movStockInsertingManagerMock.getLot("L1")).thenReturn(new Lot("L1"));
+		when(inventoryManagerMock.newMedicalInventory(any(), anyList())).thenAnswer(invocation -> {
+			MedicalInventory saved = invocation.getArgument(0);
+			saved.setId(5);
+			return saved;
+		});
+		String body = """
+			{"inventory":{"inventoryDate":"2026-10-01T09:00:00","inventoryReference":"INV-1","inventoryType":"main"},
+			 "rows":[{"theoreticQty":0,"realQty":12,"medical":{"code":40},"newLot":true,"lot":{"code":"L1","dueDate":"2028-06-30"}}]}""";
+
+		this.mockMvc.perform(post("/medicalinventories").contentType(MediaType.APPLICATION_JSON).content(body))
+			.andExpect(status().isBadRequest())
+			.andExpect(content().string(containsString("lotcodealreaedyexists")));
+		verify(movStockInsertingManagerMock, never()).storeLot(any(), any(), any());
+	}
+
+	@Test
+	void testValidate_newLotsNeedACountedQuantity() throws Exception {
+		MedicalInventory inventory = inventory("draft");
+		MedicalInventoryRow row = new MedicalInventoryRow(3, BigDecimal.ZERO, BigDecimal.ZERO, inventory, new Medical(40), new Lot("AUTO1"));
+		row.setNewLot(true);
+		when(inventoryManagerMock.getInventoryById(5)).thenReturn(inventory);
+		when(rowManagerMock.getMedicalInventoryRowByInventoryId(5)).thenReturn(List.of(row));
+
+		this.mockMvc.perform(post("/medicalinventories/{id}/validate", 5))
+			.andExpect(status().isBadRequest())
+			.andExpect(content().string(containsString("newlotshouldhaverealqty")));
+	}
 }
