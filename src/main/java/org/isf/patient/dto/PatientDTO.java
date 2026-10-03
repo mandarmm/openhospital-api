@@ -123,6 +123,16 @@ public class PatientDTO {
 	@Schema(description = "Status", example = "I")
 	private PatientSTATUS status;
 
+	@Nullable
+	@Schema(description = "Marital status: unknown, single, married, divorced or widowed (when updating, left out: unchanged)",
+		example = "married", maxLength = 50)
+	private String maritalStatus;
+
+	@Nullable
+	@Schema(description = "Profession: unknown, other, farming, construction, medicine, foodhospitality, homemaker, mechanic, business, "
+		+ "janitorial, mining, engineering, or a text (when updating, left out: unchanged)", example = "farming", maxLength = 50)
+	private String profession;
+
 	@Schema(description = "Consensus flag", example = "true")
 	private boolean consensusFlag;
 
@@ -155,6 +165,22 @@ public class PatientDTO {
 
 	public void setAllergies(String allergies) {
 		this.allergies = allergies;
+	}
+
+	public String getMaritalStatus() {
+		return maritalStatus;
+	}
+
+	public void setMaritalStatus(String maritalStatus) {
+		this.maritalStatus = maritalStatus;
+	}
+
+	public String getProfession() {
+		return profession;
+	}
+
+	public void setProfession(String profession) {
+		this.profession = profession;
 	}
 
 	public String getAnamnesis() {
