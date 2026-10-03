@@ -89,6 +89,12 @@ public class ReportsController {
 		return getReport(reportsManager.getDiseasesListPdf(), request);
 	}
 
+	/** The operations (Swing Printing › Operations list). */
+	@GetMapping(value = "/reports/operations-list", produces = MediaType.APPLICATION_PDF_VALUE)
+	public ResponseEntity<byte[]> printOperationsListPdf() throws OHServiceException {
+		return pdf(reportsManager.getOperationsListPdf(), "OperationsList.pdf");
+	}
+
 	/**
 	 * The stock of a ward (Swing ward pharmacy's report {@code PharmaceuticalStockWard}), today or at the end of a day.
 	 */
