@@ -38,6 +38,7 @@ import org.isf.anamnesis.manager.PatientHistoryManager;
 import org.isf.anamnesis.model.PatientHistory;
 import org.isf.patient.data.PatientHelper;
 import org.isf.patient.manager.PatientBrowserManager;
+import org.isf.utils.exception.OHDataLockFailureException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -117,6 +118,16 @@ class PatientHistoryControllerTest {
 		mvc.perform(put("/patients/{code}/history", 7).contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(new PatientHistoryDTO())))
 			.andExpect(status().isConflict());
+
+		// as the core's aspect throws it: checked, not declared
+		when(manager.saveOrUpdate(any(PatientHistory.class))).thenAnswer(invocation -> {
+			throw new OHDataLockFailureException(
+				new org.isf.utils.exception.model.OHExceptionMessage("angal.sql.thedatahasbeenupdatedbysomeoneelse.msg"));
+		});
+		mvc.perform(put("/patients/{code}/history", 7).contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(new PatientHistoryDTO())))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.message").value("angal.sql.thedatahasbeenupdatedbysomeoneelse.msg"));
 	}
 
 	@Test
