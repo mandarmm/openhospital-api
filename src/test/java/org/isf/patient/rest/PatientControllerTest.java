@@ -661,4 +661,20 @@ class PatientControllerTest {
             .andExpect(status().isOk())
             .andExpect(content().string(containsString(PatientHelper.asJsonString(patientMapper.map2DTOList(patientList)))));
     }
+
+	@Test
+	void a_new_patient_without_marital_status_nor_profession_gets_unknown() throws Exception {
+		PatientDTO newPatient = PatientHelper.setup(patientMapper);
+		newPatient.setMaritalStatus(null);
+		newPatient.setProfession(null);
+		when(patientBrowserManagerMock.savePatient(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		this.mockMvc.perform(post("/patients").contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+				.content(PatientHelper.asJsonString(newPatient)))
+			.andExpect(status().isCreated());
+		org.mockito.ArgumentCaptor<Patient> saved = org.mockito.ArgumentCaptor.forClass(Patient.class);
+		org.mockito.Mockito.verify(patientBrowserManagerMock).savePatient(saved.capture());
+		assertThat(saved.getValue().getMaritalStatus(), org.hamcrest.Matchers.equalTo("unknown"));
+		assertThat(saved.getValue().getProfession(), org.hamcrest.Matchers.equalTo("unknown"));
+	}
 }
