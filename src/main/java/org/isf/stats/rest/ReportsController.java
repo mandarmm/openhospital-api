@@ -164,7 +164,7 @@ public class ReportsController {
 	 * The report as PDF, from the filled report rather than from the file the core also writes (its name is shared by
 	 * all the requests for the report).
 	 */
-	private static ResponseEntity<byte[]> pdf(JasperReportResultDto result, String filename) throws OHAPIException {
+	static ResponseEntity<byte[]> pdf(JasperReportResultDto result, String filename) throws OHAPIException {
 		try {
 			return ResponseEntity.ok()
 				.contentType(MediaType.APPLICATION_PDF)
