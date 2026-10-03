@@ -25,10 +25,13 @@ import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -67,6 +70,7 @@ import org.isf.utils.pagination.PagedResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.modelmapper.ModelMapper;
@@ -300,6 +304,46 @@ class PatientControllerTest {
 			.andExpect(status().isBadRequest())
 			.andExpect(content().string(containsString("Patient not updated.")));
 
+	}
+
+	/**
+	 * Test method for {@link PatientController#updatePatient(int, PatientDTO)}: the marital status and profession are
+	 * saved when sent and kept when left out.
+	 */
+	@Test
+	void when_put_update_patient_then_marital_status_and_profession_are_saved_or_kept() throws Exception {
+		Integer code = 12345;
+		Patient stored = PatientHelper.setup();
+		stored.setCode(code);
+		stored.setMaritalStatus("married");
+		stored.setProfession("farming");
+		PatientConsensus consensus = new PatientConsensus();
+		consensus.setPatient(stored);
+		when(patientBrowserManagerMock.getPatientById(code)).thenReturn(stored);
+		when(patientConsensusManagerMock.getPatientConsensusByUserId(code)).thenReturn(Optional.of(consensus));
+		when(patientBrowserManagerMock.savePatient(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		ArgumentCaptor<Patient> saved = ArgumentCaptor.forClass(Patient.class);
+
+		PatientDTO leftOut = PatientHelper.setup(patientMapper);
+		leftOut.setCode(code);
+		leftOut.setMaritalStatus(null);
+		leftOut.setProfession(null);
+		this.mockMvc.perform(put("/patients/{code}", code).contentType(MediaType.APPLICATION_JSON).content(PatientHelper.asJsonString(leftOut)))
+			.andExpect(status().isOk());
+		verify(patientBrowserManagerMock).savePatient(saved.capture());
+		assertThat(saved.getValue().getMaritalStatus(), is("married"));
+		assertThat(saved.getValue().getProfession(), is("farming"));
+
+		PatientDTO sent = PatientHelper.setup(patientMapper);
+		sent.setCode(code);
+		sent.setMaritalStatus("widowed");
+		sent.setProfession("teacher");
+		this.mockMvc.perform(put("/patients/{code}", code).contentType(MediaType.APPLICATION_JSON).content(PatientHelper.asJsonString(sent)))
+			.andExpect(status().isOk())
+			.andExpect(content().string(containsString("\"profession\":\"teacher\"")));
+		verify(patientBrowserManagerMock, times(2)).savePatient(saved.capture());
+		assertThat(saved.getValue().getMaritalStatus(), is("widowed"));
+		assertThat(saved.getValue().getProfession(), is("teacher"));
 	}
 
 	/**

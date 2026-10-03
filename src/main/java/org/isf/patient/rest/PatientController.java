@@ -138,6 +138,13 @@ public class PatientController {
 			throw new OHAPIException(new OHExceptionMessage("Malformed picture."));
 		}
 		Patient updatePatientModel = patientMapper.map2Model(updatePatient);
+		// clients that do not send them keep the stored values (they were lost on every update)
+		if (updatePatient.getMaritalStatus() == null) {
+			updatePatientModel.setMaritalStatus(patientRead.getMaritalStatus());
+		}
+		if (updatePatient.getProfession() == null) {
+			updatePatientModel.setProfession(patientRead.getProfession());
+		}
 		updatePatientModel.getPatientConsensus().setPatient(updatePatientModel);
 		updatePatientModel.getPatientConsensus().setId(patientConsensus.get().getId());
 		updatePatientModel.setLock(patientRead.getLock());
