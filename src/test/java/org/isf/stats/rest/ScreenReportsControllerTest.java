@@ -35,6 +35,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.isf.accounting.manager.BillBrowserManager;
+import org.isf.accounting.model.Bill;
 import org.isf.admission.manager.AdmissionBrowserManager;
 import org.isf.admission.model.Admission;
 import org.isf.generaldata.GeneralData;
@@ -58,6 +60,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -95,6 +100,9 @@ class ScreenReportsControllerTest {
 	@Mock
 	private HospitalBrowsingManager hospitalManagerMock;
 
+	@Mock
+	private BillBrowserManager billManagerMock;
+
 	private MockMvc mockMvc;
 
 	private AutoCloseable closeable;
@@ -107,7 +115,8 @@ class ScreenReportsControllerTest {
 		GeneralData.PHARMACEUTICALSTOCK = "PharmaceuticalStock_ver4";
 		this.mockMvc = MockMvcBuilders
 			.standaloneSetup(new ScreenReportsController(reportsManagerMock, opdManagerMock, admissionManagerMock, wardManagerMock,
-				medicalTypeManagerMock, inventoryManagerMock, patientManagerMock, labManagerMock, priceListManagerMock, hospitalManagerMock))
+				medicalTypeManagerMock, inventoryManagerMock, patientManagerMock, labManagerMock, priceListManagerMock, hospitalManagerMock,
+				billManagerMock))
 			.setControllerAdvice(new OHResponseEntityExceptionHandler())
 			.build();
 	}
@@ -195,5 +204,26 @@ class ScreenReportsControllerTest {
 		this.mockMvc.perform(get("/reports/patient/{code}", 301).param("dateFrom", "2022-01-01").param("dateTo", "2022-12-31")
 				.param("sections", "Opd", "Bills"))
 			.andExpect(status().isBadRequest());
+	}
+
+	@AfterEach
+	void logout() {
+		SecurityContextHolder.clearContext();
+	}
+
+	@Test
+	void testBillReports_needTheBillsPermission() throws Exception {
+		SecurityContextHolder.getContext().setAuthentication(
+			new UsernamePasswordAuthenticationToken("clerk", null,
+				List.of(new SimpleGrantedAuthority("reports.read"))));
+		this.mockMvc.perform(get("/reports/bill/{id}", 1)).andExpect(status().isForbidden());
+
+		SecurityContextHolder.getContext().setAuthentication(
+			new UsernamePasswordAuthenticationToken("cashier", null,
+				List.of(new SimpleGrantedAuthority("bills.read"))));
+		when(billManagerMock.getBill(1)).thenReturn(new Bill());
+		when(reportsManagerMock.getGenericReportBillPdf(eq(1), any(), eq(false), eq(false))).thenReturn(emptyReport());
+		this.mockMvc.perform(get("/reports/bill/{id}", 1)).andExpect(status().isOk());
+		this.mockMvc.perform(get("/reports/bill/{id}", 2)).andExpect(status().isNotFound());
 	}
 }
