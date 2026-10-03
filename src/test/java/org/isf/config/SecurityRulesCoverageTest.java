@@ -50,11 +50,8 @@ import org.springframework.web.bind.annotation.RestController;
  */
 class SecurityRulesCoverageTest {
 
-	/**
-	 * Paths knowingly without a permission rule. {@code bills}: OH has no {@code bills.*} permissions yet, so a rule would
-	 * lock everyone out of billing; it needs permission rows in the database first.
-	 */
-	private static final Set<String> KNOWN_WITHOUT_RULE = Set.of("bills");
+	/** Paths knowingly without a permission rule: none. */
+	private static final Set<String> KNOWN_WITHOUT_RULE = Set.of();
 
 	@Test
 	void everyEndpointHasASecurityRule() throws Exception {

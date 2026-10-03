@@ -304,6 +304,12 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.GET, "/pricelists/**").hasAnyAuthority("pricelists.read")
 				.requestMatchers(HttpMethod.PUT, "/pricelists/**").hasAuthority("pricelists.update")
 				.requestMatchers(HttpMethod.DELETE, "/pricelists/**").hasAuthority("pricelists.delete")
+				// bills (the searches by items or payments are POSTs that read)
+				.requestMatchers(HttpMethod.POST, "/bills/search/**").hasAuthority("bills.read")
+				.requestMatchers(HttpMethod.POST, "/bills/**").hasAuthority("bills.create")
+				.requestMatchers(HttpMethod.GET, "/bills/**").hasAuthority("bills.read")
+				.requestMatchers(HttpMethod.PUT, "/bills/**").hasAuthority("bills.update")
+				.requestMatchers(HttpMethod.DELETE, "/bills/**").hasAuthority("bills.delete")
 				// pricesothers
 				.requestMatchers(HttpMethod.POST, "/pricesothers/**").hasAuthority("pricesothers.create")
 				.requestMatchers(HttpMethod.GET, "/pricesothers/**").hasAnyAuthority("pricesothers.read")
