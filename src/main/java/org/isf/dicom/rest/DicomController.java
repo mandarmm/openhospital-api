@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.sql.Blob;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -42,6 +43,7 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 
 import org.isf.dicom.dto.DicomFileDTO;
+import org.isf.dicom.dto.DicomSeriesDTO;
 import org.isf.dicom.manager.DicomManagerFactory;
 import org.isf.dicom.manager.DicomManagerInterface;
 import org.isf.dicom.manager.SourceFiles;
@@ -92,18 +94,22 @@ public class DicomController {
 		this.dicomTypeManager = dicomTypeManager;
 	}
 
-	/** The patient's images, by series then file, newest series first. */
+	/** The patient's series of images, newest first: each with its first image and the ids of all its images. */
 	@GetMapping(value = "/dicom/patients/{code}", produces = MediaType.APPLICATION_JSON_VALUE)
-	public List<DicomFileDTO> getPatientFiles(@PathVariable int code) throws OHServiceException {
+	public List<DicomSeriesDTO> getPatientSeries(@PathVariable int code) throws OHServiceException {
 		LOGGER.info("Get the images of patient {}.", code);
 		checkPatient(code);
-		FileDicom[] files = manager().loadPatientFiles(code);
-		return Arrays.stream(files == null ? new FileDicom[0] : files)
+		// the core gives the first image of each series
+		FileDicom[] firsts = manager().loadPatientFiles(code);
+		List<DicomSeriesDTO> series = new ArrayList<>();
+		for (FileDicom first : Arrays.stream(firsts == null ? new FileDicom[0] : firsts)
 			.sorted(Comparator.comparing((FileDicom file) -> date(file), Comparator.nullsLast(Comparator.reverseOrder()))
-				.thenComparing(FileDicom::getDicomSeriesNumber, Comparator.nullsLast(Comparator.naturalOrder()))
-				.thenComparing(FileDicom::getIdFile))
-			.map(DicomController::toDTO)
-			.toList();
+				.thenComparing(FileDicom::getDicomSeriesNumber, Comparator.nullsLast(Comparator.naturalOrder())))
+			.toList()) {
+			Long[] ids = manager().getSeriesDetail(code, first.getDicomSeriesNumber());
+			series.add(new DicomSeriesDTO(toDTO(first), ids == null ? List.of(first.getIdFile()) : List.of(ids)));
+		}
+		return series;
 	}
 
 	/** The image's thumbnail (JPEG, 100 pixels wide). */
@@ -192,6 +198,7 @@ public class DicomController {
 
 	/** As the desktop client: the identifiers the viewer groups and looks up by, from the chosen series. */
 	private void intoSeries(FileDicom detail, int code, String series) throws OHServiceException {
+		// the core gives the first image of each series
 		FileDicom[] files = manager().loadPatientFiles(code);
 		FileDicom target = Arrays.stream(files == null ? new FileDicom[0] : files)
 			.filter(file -> series.equals(file.getDicomSeriesNumber()))
