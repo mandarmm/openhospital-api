@@ -112,6 +112,12 @@ public class DicomController {
 		return series;
 	}
 
+	/** An image's details (the desktop viewer shows them over the image: patient, study, series). */
+	@GetMapping(value = "/dicom/patients/{code}/series/{series}/files/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+	public DicomFileDTO getFile(@PathVariable int code, @PathVariable String series, @PathVariable long id) throws OHServiceException {
+		return toDTO(load(code, series, id));
+	}
+
 	/** The image's thumbnail (JPEG, 100 pixels wide). */
 	@GetMapping(value = "/dicom/patients/{code}/series/{series}/files/{id}/thumbnail", produces = MediaType.IMAGE_JPEG_VALUE)
 	public byte[] getThumbnail(@PathVariable int code, @PathVariable String series, @PathVariable long id) throws OHServiceException {
@@ -328,6 +334,7 @@ public class DicomController {
 		DicomType type = file.getDicomType();
 		return new DicomFileDTO(file.getIdFile(), file.getPatId(), file.getFileName(), file.getDicomSeriesNumber(), file.getDicomSeriesInstanceUID(),
 			file.getDicomSeriesDescription(), file.getDicomSeriesDate(), file.getDicomStudyDate(), file.getDicomStudyDescription(), file.getModality(),
-			file.getDicomInstitutionName(), type == null ? null : new DicomTypeDTO(type.getDicomTypeID(), type.getDicomTypeDescription()));
+			file.getDicomInstitutionName(), type == null ? null : new DicomTypeDTO(type.getDicomTypeID(), type.getDicomTypeDescription()),
+			file.getDicomStudyId(), file.getDicomPatientName(), file.getDicomPatientSex(), file.getDicomPatientAge());
 	}
 }
